@@ -1,0 +1,122 @@
+
+
+# def lambda_handler(event, context):
+
+
+#     #Compare情報マスタ
+#     compare = wr.s3.read_csv(f's3://mastergpoc/temp/01_product_compare.csv')
+#     Id_List = compare['Project_Id'].tolist()
+   
+#     http_method = 'POST'if not ist else 'PUT'
+#     status_code = 400 if not ist else 200
+    
+#     return {
+#         'statusCode': status_code,
+#         'body': http_method
+#     }
+   
+import json
+import boto3
+import awswrangler as wr
+from botocore.exceptions import ClientError
+
+# AWS クライアントを初期化
+s3 = boto3.client('s3')
+dynamodb = boto3.resource('dynamodb')
+table_name = "YourDynamoDBTable"
+api_endpoint = "https://your-api-endpoint.com"
+ #Compare情報マスタ
+compare = wr.s3.read_csv(f's3://mastergpoc/temp/01_product_compare.csv')
+Id_List = compare['Project_Id'].tolist()
+
+def lambda_handler(event, context):
+    try:
+        # ステップ1: S3から差分ファイルを読み込む
+        bucket_name = "your-bucket-name"
+        file_key = "path/to/diff_file.csv"
+        data = wr.s3.read_csv(f's3://mastergpoc/temp/01_product_compare.csv')
+        Id_List = compare['Project_Id'].tolist()
+        url = "https://api.plapi-product.com/plapi/api/v1/categories?limit=20&page=1"
+        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
+        headers = {"User-Agent": "test-agent",'Authorization': token, 'ClientId':'75'}
+        response = requests.get(url, headers=headers)
+
+        logger.info("log test")
+
+
+
+        # ステップ2: 差分データをループ処理し、条件に基づいてAPIを呼び出す
+        for index, row in data.iterrows():
+            product_id = row.get('Product_Id')
+            payload = json.dumps(row.to_dict())
+
+            if not product_id:
+                # 新しい商品を作成するためにPOST APIを呼び出す
+                response = call_api("POST", api_endpoint, payload)
+            else:
+                # 商品を更新するためにPUT APIを呼び出す
+                response = call_api("PUT", f"{api_endpoint}/{product_id}", payload)
+            
+            if response.status_code >= 400:
+                log_to_dynamodb(row.to_dict(), "API呼び出し中のエラー")
+
+        # ステップ3: 差分データをアーカイブ
+        archive_s3_file(bucket_name, file_key)
+
+        return {
+            "statusCode": 200,
+            "body": json.dumps("処理が正常に完了しました")
+        }
+
+    except Exception as e:
+        # 全ての例外をキャッチしてログに記録
+        print(f"エラーが発生しました: {str(e)}")
+        return {
+            "statusCode": 500,
+            "body": json.dumps(f"エラー: {str(e)}")
+        }
+
+def call_api(method, url, payload):
+    """APIを呼び出すための関数"""
+    import requests
+    url = "https://api.plapi-product.com/plapi/api/v1/categories?limit=20&page=1"
+    token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
+    headers = {"User-Agent": "test-agent",'Authorization': token, 'ClientId':'75'}
+    response = requests.get(url, headers=headers)
+    compare = wr.s3.read_csv(f's3://mastergpoc/temp/01_product_compare.csv')
+    Id_List = compare['Project_Id'].tolist()
+
+    logger.info("log test")
+    try:
+        headers = {"User-Agent": "test-agent",'Authorization': token, 'ClientId':'75'}
+        if method == "POST":
+            response = requests.post(url, data=compare, headers=headers)
+        elif method == "PUT":
+            response = requests.put(url, data=compare, headers=headers)
+        else:
+            raise ValueError("サポートされていないHTTPメソッド")
+        return response
+    except requests.exceptions.RequestException as e:
+        print(f"API呼び出しに失敗しました: {str(e)}")
+        raise
+
+def log_to_dynamodb(data, error_message):
+    """エラーをDynamoDBに記録する"""
+    table = dynamodb.Table(table_name)
+    table.put_item(Item={
+        "Product_Id": data.get('Product_Id', 'Unknown'),
+        "Data": json.dumps(data),
+        "Error": error_message
+    })
+
+def archive_s3_file(bucket_name, file_key):
+    """ファイルをアーカイブまたは削除する"""
+    archive_key = f"archive/{file_key.split('/')[-1]}"
+    try:
+        # ファイルをアーカイブディレクトリにコピー
+        s3.copy_object(Bucket=bucket_name, CopySource=f"{bucket_name}/{file_key}", Key=archive_key)
+        # 元のファイルを削除
+        s3.delete_object(Bucket=bucket_name, Key=file_key)
+    except ClientError as e:
+        print(f"ファイルのアーカイブ中にエラーが発生しました: {str(e)}")
+        raise
