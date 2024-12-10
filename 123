@@ -3,6 +3,7 @@ import logging
 import awswrangler as wr
 import requests
 import pandas as pd
+from botocore.exceptions import ClientError
 
 # ログ設定を初期化
 logger = logging.getLogger()
@@ -13,17 +14,25 @@ def lambda_handler(event, context):
         # ステップ1: S3から差分ファイルを読み込む
         bucket_name = "mastergpoc"
         file_key = "temp/01_product_compare.csv"
-        logger.info("S3からファイルを読み込み中...")
-        data = wr.s3.read_csv(f's3://{bucket_name}/{file_key}')
+        logger.info(f"S3のファイルを読み込み中: s3://{bucket_name}/{file_key}")
+
+        try:
+            data = wr.s3.read_csv(f's3://{bucket_name}/{file_key}')
+        except ClientError as e:
+            logger.error(f"S3ファイルの読み込みに失敗しました: {str(e)}")
+            return {
+                "statusCode": 500,
+                "body": f"S3ファイルの読み込みに失敗: {str(e)}"
+            }
 
         # buturyu_cdリストを取得
         buturyu_cd_list = data['buturyu_cd'].tolist()
-        logger.info(f"buturyu_cdリスト: {buturyu_cd_list}")
+        logger.info(f"取得したbuturyu_cdリスト: {buturyu_cd_list}")
 
         # buturyu_cdを結合して1つのAPIリクエストを作成
         joined_buturyu_cd = "&".join(map(str, buturyu_cd_list))  # 例: 425742&12345
         api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs/{joined_buturyu_cd}"
-        logger.info(f"API URL: {api_url}")
+        logger.info(f"作成したAPI URL: {api_url}")
 
         # トークンとヘッダーを設定
         token = ("Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0."
