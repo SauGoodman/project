@@ -3,6 +3,7 @@ import logging
 import awswrangler as wr
 import requests
 import pandas as pd
+from botocore.exceptions import ClientError
 
 # ログ設定を初期化
 logger = logging.getLogger()
@@ -19,8 +20,7 @@ def postPutProducts(input_file_key, output_file_key, bucket_name):
         result_data = []
 
         # トークンとヘッダーを設定
-        token = ("Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0."
-                 "LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9y")
+        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
         headers = {
             "User-Agent": "test-agent",
             "Authorization": token,
@@ -45,14 +45,14 @@ def postPutProducts(input_file_key, output_file_key, bucket_name):
                 logger.info(f"{method_type} 成功: {result}")
                 result_data.append({
                     "method_type": method_type,
-                    "product_id": result.get("product_id", "null"),
+                    "product_id": result.get("product_id", row.get("product_id", "null")),
                     **row.to_dict()  # 元のデータを含める
                 })
             else:  # エラー時
                 logger.error(f"{method_type} 失敗: {response.status_code} - {response.text}")
                 result_data.append({
                     "method_type": method_type,
-                    "product_id": "null",
+                    "product_id": row.get("product_id", "null"),
                     **row.to_dict()
                 })
 
@@ -72,3 +72,11 @@ def postPutProducts(input_file_key, output_file_key, bucket_name):
             "statusCode": 500,
             "body": f"エラー: {str(e)}"
         }
+
+# Lambda handler
+def lambda_handler(event, context):
+    input_file_key = "temp/01_product_compare.csv"
+    output_file_key = "results/01_product_api.csv"
+    bucket_name = "mastergpoc"
+
+    return postPutProducts(input_file_key, output_file_key, bucket_name)
