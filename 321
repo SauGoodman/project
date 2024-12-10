@@ -2,6 +2,7 @@ import json
 import logging
 import awswrangler as wr
 import requests
+import pandas as pd
 
 # ログ設定を初期化
 logger = logging.getLogger()
@@ -16,8 +17,13 @@ def lambda_handler(event, context):
         data = wr.s3.read_csv(f's3://{bucket_name}/{file_key}')
 
         # buturyu_cdリストを取得
-        buturyu_cd_List = data['buturyu_cd'].tolist()
-        logger.info(f"buturyu_cd List: {buturyu_cd_List}")
+        buturyu_cd_list = data['buturyu_cd'].tolist()
+        logger.info(f"buturyu_cdリスト: {buturyu_cd_list}")
+
+        # buturyu_cdを結合して1つのAPIリクエストを作成
+        joined_buturyu_cd = "&".join(map(str, buturyu_cd_list))  # 例: 215&10034&11596
+        api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs/{joined_buturyu_cd}"
+        logger.info(f"API URL: {api_url}")
 
         # トークンとヘッダーを設定
         token = ("Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0."
@@ -28,22 +34,28 @@ def lambda_handler(event, context):
             "ClientId": "75"
         }
 
-        # ステップ2: APIリクエストをループ処理
-        for index, buturyu_cd in enumerate(buturyu_cd_List):
-            api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs/{buturyu_cd}"
-            logger.info(f"API URL ({index + 1}/{len(buturyu_cd_List)}): {api_url}")
+        # ステップ2: APIリクエストを1回実行
+        logger.info("APIリクエストを送信中...")
+        response = requests.get(api_url, headers=headers)
+        if response.status_code == 200:
+            api_data = response.json()
+            logger.info(f"APIリクエスト成功。取得したデータ: {api_data}")
 
-            # APIリクエストを実行
-            response = requests.get(api_url, headers=headers)
-
-            if response.status_code == 200:
-                logger.info(f"成功: {response.json()}")
-            else:
-                logger.error(f"失敗 (ステータスコード: {response.status_code}): {response.text}")
+            # 結果を保存
+            result_df = pd.DataFrame(api_data)  # APIの応答がリスト形式を仮定
+            output_key = "results/output_catalogs.csv"
+            wr.s3.to_csv(result_df, f"s3://{bucket_name}/{output_key}", index=False)
+            logger.info(f"結果がS3に保存されました: s3://{bucket_name}/{output_key}")
+        else:
+            logger.error(f"APIリクエスト失敗: {response.status_code} - {response.text}")
+            return {
+                "statusCode": response.status_code,
+                "body": f"APIリクエスト失敗: {response.text}"
+            }
 
         return {
             "statusCode": 200,
-            "body": json.dumps("全てのAPIリクエストが完了しました。")
+            "body": json.dumps("APIリクエストが正常に完了しました。")
         }
 
     except Exception as e:
