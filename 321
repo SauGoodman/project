@@ -3,6 +3,7 @@ import logging
 import awswrangler as wr
 import requests
 import pandas as pd
+from botocore.exceptions import ClientError
 
 # ログ設定を初期化
 logger = logging.getLogger()
@@ -13,14 +14,13 @@ def postPutProducts(input_file_key, output_file_key, bucket_name):
         # ステップ1: S3から入力ファイルを読み込む
         logger.info("S3から入力ファイルを読み込み中...")
         data = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}')
-        logger.info(f"入力データ: {data}")
+        logger.info(f"入力データ: {data.head()}")  # 確認のため先頭5行を表示
 
         # 結果リストを初期化
         result_data = []
 
         # トークンとヘッダーを設定
-        token = ("Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0."
-                 "LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9y")
+        token = "Bearer <your-api-token>"  # Replace with your actual token
         headers = {
             "User-Agent": "test-agent",
             "Authorization": token,
@@ -31,7 +31,7 @@ def postPutProducts(input_file_key, output_file_key, bucket_name):
         for index, row in data.iterrows():
             buturyu_cd = row['buturyu_cd']
             api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs/{buturyu_cd}"
-            
+
             if pd.isnull(row.get("product_id")):  # product_id が null の場合は POST
                 method_type = "POST"
                 response = requests.post(api_url, headers=headers, json=row.to_dict())
@@ -43,18 +43,15 @@ def postPutProducts(input_file_key, output_file_key, bucket_name):
             if response.status_code in [200, 201]:  # 成功時
                 result = response.json()
                 logger.info(f"{method_type} 成功: {result}")
-                result_data.append({
-                    "method_type": method_type,
-                    "product_id": result.get("product_id", "null"),
-                    **row.to_dict()  # 元のデータを含める
-                })
+                row["product_id"] = result.get("product_id", row.get("product_id"))  # 更新product_id
+                row["method_type"] = method_type  # method_typeを追加
             else:  # エラー時
                 logger.error(f"{method_type} 失敗: {response.status_code} - {response.text}")
-                result_data.append({
-                    "method_type": method_type,
-                    "product_id": "null",
-                    **row.to_dict()
-                })
+                row["method_type"] = method_type
+                row["product_id"] = "null"  # エラーの場合product_idをnullに設定
+                row["error_message"] = response.text  # エラー内容を記録
+
+            result_data.append(row)
 
         # ステップ4: 結果を保存
         result_df = pd.DataFrame(result_data)
