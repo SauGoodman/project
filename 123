@@ -30,7 +30,7 @@ def lambda_handler(event, context):
 
         # ステップ2: データ処理を準備
         result_data = []
-        token = "Bearer <your-token>"  # 必须替换为实际的 API Token
+        token = "Bearer <your-token>"
         headers = {
             "User-Agent": "test-agent",
             "Authorization": token,
