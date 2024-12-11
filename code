@@ -3,87 +3,104 @@ import logging
 import awswrangler as wr
 import requests
 import pandas as pd
-from botocore.exceptions import ClientError
 
-# ログ設定の初期化
+# ログの設定
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     try:
-        # ステップ1: S3からCSVファイルを読み込む
+        # S3バケットとファイルキーの指定
         bucket_name = "mastergpoc"
-        input_file_key = "temp/01_product_compare.csv"
-        post_file_key = "results/01_product_apipost.csv"
-        put_file_key = "results/01_product_apiput.csv"
+        file_key = "temp/01_product_apipost.csv"  # CSVファイルのパス
 
-        logger.info(f"S3からファイルを読み込み中: s3://{bucket_name}/{input_file_key}")
+        logger.info(f"S3からCSVファイルを読み込み中: s3://{bucket_name}/{file_key}")
 
-        # S3からCSVファイルの読み込み
+        # S3からCSVファイルを読み込む
         try:
-            data = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}')
-        except ClientError as e:
-            logger.error(f"S3ファイルの読み込みに失敗しました: {str(e)}")
-            return {"statusCode": 500, "body": f"S3ファイルの読み込みに失敗しました: {str(e)}"}
+            df = wr.s3.read_csv(f"s3://{bucket_name}/{file_key}")
+        except Exception as e:
+            logger.error(f"CSVファイルの読み込みに失敗しました: {str(e)}")
+            return {
+                "statusCode": 500,
+                "body": f"CSVファイルの読み込みに失敗しました: {str(e)}"
+            }
 
-        # API URLの作成
-        buturyu_cd_list = data['buturyu_cd'].tolist()
-        joined_buturyu_cd = "&".join(map(str, buturyu_cd_list))
-        api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{joined_buturyu_cd}"
-        logger.info(f"生成されたAPI URL: {api_url}")
+        # APIエンドポイントのURL
+        api_url = "https://api.plapi-product.com/plapi/api/v1/products"
 
-        # APIトークンとヘッダーの設定
-        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
+        # ヘッダーの設定
+        token = "Bearer <YOUR_TOKEN_HERE>"  # トークンを設定
         headers = {
-            "User-Agent": "test-agent",
-            "Authorization": token,
-            "ClientId": "75"
+            "Content-Type": "application/json",
+            "Authorization": token
         }
 
-        # APIリクエストの送信
-        logger.info("APIリクエストを送信中...")
-        response = requests.get(api_url, headers=headers)
-        if response.status_code not in [200, 400]:
-            logger.error(f"APIリクエストに失敗しました: {response.status_code} - {response.text}")
-            return {"statusCode": response.status_code, "body": f"APIリクエストに失敗しました: {response.text}"}
+        # CSVからJSONデータを構築
+        product_data = []
+        for _, row in df.iterrows():
+            product = {
+                "category_id": "j3d7j0000021623",
+                "com_product_id": row["buturyu_cd"],  # CSVのbuturyu_cdの値を使用
+                "product_name": row["seihin_rkj"],  # CSVのseihin_rkjの値を使用
+                "product_text": None,
+                "product_status": "1",
+                "edit_status": "1",
+                "client_read_auth": "",
+                "client_write_auth": "",
+                "view_auth_group": "j3d7j_base",
+                "edit_auth_group": "j3d7j_base",
+                "basic": [
+                    {
+                        "id": "j3d7jE0000289845",
+                        "key": "正式商品名",
+                        "value": [row["seisiki_syohin_nm"]]  # CSVのseisiki_syohin_nmの値を使用
+                    },
+                    {
+                        "id": "j3d7jE0000289846",
+                        "key": "正式商品名英表記",
+                        "value": [row["seisiki_syohin_ob"]]  # CSVのseisiki_syohin_obの値を使用
+                    },
+                    {
+                        "id": "j3d7jE0000289847",
+                        "key": "製品名漢字",
+                        "value": [row["seihin_kj"]]  # CSVのseihin_kjの値を使用
+                    },
+                    {
+                        "id": "j3d7jE0000289853",
+                        "key": "希望小売価格",
+                        "value": [row["kibou_kouri_pr"]]  # CSVのkibou_kouri_prの値を使用
+                    }
+                ]
+            }
+            product_data.append(product)
 
-        # APIレスポンスの解析
-        try:
-            api_data = response.json()
-        except json.JSONDecodeError:
-            logger.error(f"APIレスポンスのデコードに失敗しました: {response.text}")
-            return {"statusCode": 500, "body": "APIレスポンスのデコードに失敗しました。"}
+        # APIリクエスト用のデータを準備
+        payload = {
+            "products": product_data
+        }
 
-        logger.info(f"受信したAPIレスポンス: {api_data}")
+        # APIリクエストを送信
+        logger.info(f"APIリクエストを送信中: {api_url}")
+        response = requests.post(api_url, headers=headers, json=payload)
 
-        # APIレスポンスの処理
-        errors = api_data.get("errors", [])
-        templates = api_data.get("templates", [])
-
-        error_ids = {str(error["com_product_id"]) for error in errors}
-        template_dict = {str(template["com_product_id"]): template["product_id"] for template in templates}
-
-        # POSTとPUT用のデータフレームに分割
-        post_df = data[data["buturyu_cd"].isin(error_ids)]
-        put_df = data[data["buturyu_cd"].isin(template_dict.keys())]
-
-        # PUTデータフレームにproduct_idを更新
-        put_df["product_id"] = put_df["buturyu_cd"].map(template_dict)
-        put_df = put_df[["product_id"] + list(data.columns)]
-
-        # 処理結果をS3に保存
-        if not post_df.empty:
-            wr.s3.to_csv(post_df, f's3://{bucket_name}/{post_file_key}', index=False)
-            logger.info(f"POST結果が保存されました: s3://{bucket_name}/{post_file_key}")
-
-        if not put_df.empty:
-            wr.s3.to_csv(put_df, f's3://{bucket_name}/{put_file_key}', index=False)
-            logger.info(f"PUT結果が保存されました: s3://{bucket_name}/{put_file_key}")
-
-        logger.info("処理が正常に完了しました。")
-        return {"statusCode": 200, "body": json.dumps("処理が正常に完了しました。")}
+        # レスポンスの処理
+        if response.status_code == 200:
+            logger.info(f"APIリクエスト成功: {response.json()}")
+            return {
+                "statusCode": 200,
+                "body": json.dumps("APIリクエスト成功")
+            }
+        else:
+            logger.error(f"APIリクエスト失敗: {response.status_code} - {response.text}")
+            return {
+                "statusCode": response.status_code,
+                "body": f"APIリクエスト失敗: {response.text}"
+            }
 
     except Exception as e:
-        # エラーログの記録
         logger.error(f"エラーが発生しました: {str(e)}")
-        return {"statusCode": 500, "body": f"エラー: {str(e)}"}
+        return {
+            "statusCode": 500,
+            "body": f"エラー: {str(e)}"
+        }
