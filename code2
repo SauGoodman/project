@@ -11,7 +11,7 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     try:
-        # S3のファイルパス設定
+        # S3 ファイルパスの設定
         bucket_name = "mastergpoc"
         input_file_key = "temp/01_product_compare.csv"
         output_file_key = "results/01_product_api.csv"
@@ -58,7 +58,8 @@ def lambda_handler(event, context):
                 # レスポンスの解析
                 if response.status_code in [200, 201]:
                     api_result = response.json()
-                    product_id = api_result.get("product_id", "null")
+                    if method_type == "PUT":
+                        product_id = api_result.get("product_id", "null")
                     logger.info(f"{method_type} 成功: {api_result}")
                 else:
                     logger.error(f"{method_type} 失敗: {response.status_code} - {response.text}")
