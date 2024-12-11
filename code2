@@ -59,7 +59,7 @@ def lambda_handler(event, context):
                 if response.status_code in [200, 201]:
                     api_result = response.json()
                     if method_type == "PUT":
-                        product_id = api_result.get("product_id", "null")
+                        product_id = row.get("product_id", "null")  # CSV 中的 project_id
                     logger.info(f"{method_type} 成功: {api_result}")
                 else:
                     logger.error(f"{method_type} 失敗: {response.status_code} - {response.text}")
