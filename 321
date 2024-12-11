@@ -1,7 +1,6 @@
 import json
 import logging
 import awswrangler as wr
-import requests
 import pandas as pd
 from botocore.exceptions import ClientError
 
@@ -11,81 +10,76 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     try:
-        # ステップ1: S3から差分ファイルを読み込む
+        # S3のバケットとファイルキーを設定
         bucket_name = "mastergpoc"
         input_file_key = "temp/01_product_compare.csv"
-        output_file_key = "results/01_product_api.csv"
+        output_post_file_key = "results/01_product_apipost.csv"
+        output_put_file_key = "results/01_product_apiput.csv"
+
         logger.info(f"S3のファイルを読み込み中: s3://{bucket_name}/{input_file_key}")
 
+        # ステップ1: S3からCSVファイルを読み込む
         try:
-            # S3からCSVファイルを読み込む
             data = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}')
         except ClientError as e:
-            # S3読み込みエラーを記録
             logger.error(f"S3ファイルの読み込みに失敗しました: {str(e)}")
             return {
                 "statusCode": 500,
                 "body": f"S3ファイルの読み込みに失敗: {str(e)}"
             }
 
-        # ステップ2: 必要な列を追加
-        if "method_type" not in data.columns:
-            data.insert(0, "method_type", "")  # method_type列を追加
-        if "product_id" not in data.columns:
-            data.insert(1, "product_id", "null")  # product_id列を追加
-
-        # 結果を保存するリスト
-        result_data = []
-
-        # APIトークンとヘッダーを設定
-        token = "Bearer <your-token>"
-        headers = {
-            "User-Agent": "test-agent",
-            "Authorization": token,
-            "ClientId": "75"
+        # API仮レスポンスのシミュレーション
+        # 正式なAPI呼び出しコードがある場合はここで置き換える
+        api_response = {
+            "errors": [
+                {"status_code": "400", "com_product_id": "215", "error": "取得できる情報がありません。"},
+                {"status_code": "400", "com_product_id": "10034", "error": "取得できる情報がありません。"},
+                {"status_code": "400", "com_product_id": "11596", "error": "取得できる情報がありません。"}
+            ],
+            "templates": [
+                {
+                    "product_id": "j3d7j20241206134045352639",
+                    "category_name": "suzuki_test",
+                    "category_id": "j3d7j0000021623",
+                    "product_name": "商品登録テスト",
+                    "product_text": None,
+                    "product_status": 1,
+                    "edit_status": 1,
+                    "product_status_text": "販売中"
+                }
+            ]
         }
 
-        # 各レコードを処理
-        for index, row in data.iterrows():
-            buturyu_cd = row['buturyu_cd']
-            api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs/{buturyu_cd}"
+        # ステップ2: `errors` と `templates` の処理
+        post_data = []
+        put_data = []
 
-            # デフォルト値を設定
-            method_type = "POST"
-            product_id = "null"
+        # `errors` の処理（POSTデータ）
+        for error in api_response["errors"]:
+            post_data.append({
+                "method_type": "POST",
+                "product_id": "null",
+                **error
+            })
 
-            try:
-                # POSTまたはPUTリクエストを送信
-                if row["product_id"] == "null":  # product_id が null の場合は POST
-                    response = requests.post(api_url, headers=headers, json=row.to_dict())
-                else:  # product_id が存在する場合は PUT
-                    method_type = "PUT"
-                    response = requests.put(api_url, headers=headers, json=row.to_dict())
+        # `templates` の処理（PUTデータ）
+        for template in api_response["templates"]:
+            put_data.append({
+                "method_type": "PUT",
+                "product_id": template.get("product_id", "null"),
+                **template
+            })
 
-                # レスポンス解析
-                if response.status_code in [200, 201]:
-                    api_result = response.json()
-                    product_id = api_result.get("product_id", "null")
-                    logger.info(f"{method_type} 成功: {api_result}")
-                else:
-                    logger.error(f"{method_type} 失敗: {response.status_code} - {response.text}")
-            except Exception as e:
-                logger.error(f"APIリクエスト中にエラーが発生しました: {str(e)}")
+        # ステップ3: データをDataFrameに変換してS3に書き出し
+        if post_data:
+            post_df = pd.DataFrame(post_data)
+            wr.s3.to_csv(post_df, f's3://{bucket_name}/{output_post_file_key}', index=False)
+            logger.info(f"POSTデータがS3に保存されました: s3://{bucket_name}/{output_post_file_key}")
 
-            # 結果を収集
-            row["method_type"] = method_type
-            row["product_id"] = product_id
-            result_data.append(row)
-
-        # ステップ3: 結果を保存
-        if result_data:
-            result_df = pd.DataFrame(result_data)
-
-            # S3にCSVファイルを保存
-            wr.s3.to_csv(result_df, f's3://{bucket_name}/{output_file_key}', index=False)
-            logger.info(f"結果がS3に保存されました: s3://{bucket_name}/{output_file_key}")
-        else:
-            logger.warning("結果データが空です。CSVファイルは生成されませんでした。")
+        if put_data:
+            put_df = pd.DataFrame(put_data)
+            wr.s3.to_csv(put_df, f's3://{bucket_name}/{output_put_file_key}', index=False)
+            logger.info(f"PUTデータがS3に保存されました: s3://{bucket_name}/{output_put_file_key}")
 
         return {
             "statusCode": 200,
