@@ -2,7 +2,6 @@ import json
 import logging
 import awswrangler as wr
 import requests
-import math
 import pandas as pd
 from botocore.exceptions import ClientError
 
@@ -10,18 +9,10 @@ from botocore.exceptions import ClientError
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def sanitize_value(value, default="default_value"):
+def sanitize_value(value, default=""):
     """値をクリーニングし、欠損値をデフォルト値に置き換える"""
-    if pd.isna(value):  # PandasのNaNチェック
+    if pd.isna(value) or value == "":
         return default
-    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
-        return default
-    return value
-
-def sanitize_float(value):
-    """浮動小数点値をクリーニング"""
-    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
-        return 0  # 無効値を0に置き換え
     return value
 
 def lambda_handler(event, context):
@@ -42,25 +33,7 @@ def lambda_handler(event, context):
                 "body": f"CSVファイルの読み込みに失敗しました: {str(e)}"
             }
 
-        # ステップ2: API URLの構築
-        # CSVのbuturyu_cd列をリスト化してAPIパラメータに統合
-        # buturyu_cd_list = df['buturyu_cd'].tolist()
-        # joined_buturyu_cd = "&".join(map(str, buturyu_cd_list))  # 値を&で連結
-        # api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{joined_buturyu_cd}"  # 動的にURLを構築
-        # logger.info(f"生成されたAPI URL: {api_url}")
-
-        # POSTリクエスト用のAPIエンドポイント
-        post_api_url = "https://api.plapi-product.com/plapi/api/v1/products"  # 固定URL
-
-        # ステップ3: APIトークンとヘッダーの設定
-        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
-        headers = {
-            "User-Agent": "test-agent",
-            "Authorization": token,
-            "ClientId": "75"
-        }
-
-         # 各列の欠損値をデフォルト値で埋める
+        # データの欠損値をデフォルト値で埋める
         df.fillna({
             "buturyu_cd": "default_id",          # 商品コードが空の場合のデフォルト値
             "seihin_rkj": "default_name",        # 製品名が空の場合のデフォルト値
@@ -70,38 +43,70 @@ def lambda_handler(event, context):
             "kibou_kouri_pr": 0                  # 希望小売価格が空の場合は0
         }, inplace=True)
 
-        # ステップ4: POST用のJSONデータを構築
+        # POSTリクエスト用のAPIエンドポイント
+        post_api_url = "https://api.plapi-product.com/plapi/api/v1/products"  # 固定URL
+
+        # ステップ2: APIトークンとヘッダーの設定
+        token = "Bearer your_api_token_here"  # トークンを適切に設定してください
+        headers = {
+            "Authorization": token,
+            "Content-Type": "application/json",
+            "ClientId": "75"
+        }
+
+        # ステップ3: POST用のJSONデータを構築
         product_data = []
         for _, row in df.iterrows():
             product = {
-                "category_id": "j3d7j0000021623",  # カテゴリID
-                "com_product_id": sanitize_value(row["buturyu_cd"], "default_id"),  # 商品コード
-                "product_name": sanitize_value(row["seihin_rkj"], "default_name"),  # 製品名
-                "product_text": None,  # テキストがない場合はNone
-                "product_status": "1",  # ステータスを固定
-                "edit_status": "1",    # 編集ステータス
-                "view_auth_group": "j3d7j_base",  # 権限グループ（表示）
-                "edit_auth_group": "j3d7j_base",  # 権限グループ（編集）
+                "category_id": "j3d7jC0000021623",
+                "com_product_id": sanitize_value(row["buturyu_cd"], "default_id"),
+                "product_name": sanitize_value(row["seihin_rkj"], "default_name"),
+                "product_text": "",
+                "product_status": "1",  # 必須入力（1～9まで）
+                "edit_status": "1",    # 必須入力（1～5まで）
+                "client_read_auth": "",
+                "client_write_auth": "",
                 "basic": [
                     {
-                        "id": "j3d7jE0000289845",  # 属性ID
+                        "id": "j3d7jE0000289845",
                         "key": "正式商品名",
-                        "value": [sanitize_value(row["seisiki_syohin_nm"], "default_product")]  # 正式商品名の値
+                        "value": [sanitize_value(row["seisiki_syohin_nm"], "default_product")]
                     },
                     {
                         "id": "j3d7jE0000289846",
-                        "key": "正式商品名英表記",
-                        "value": [sanitize_value(row["seisiki_syohin_ob"], "default_english")]  # 英語表記
+                        "key": "正式商品名英名",
+                        "value": [sanitize_value(row["seisiki_syohin_ob"], "default_english")]
                     },
                     {
                         "id": "j3d7jE0000289847",
-                        "key": "製品名漢字",
-                        "value": [sanitize_value(row["seihin_kj"], "default_kanji")]  # 製品名（漢字）
+                        "key": "製品名称漢字",
+                        "value": [sanitize_value(row["seihin_kj"], "default_kanji")]
                     },
                     {
                         "id": "j3d7jE0000289853",
                         "key": "希望小売価格",
-                        "value": [sanitize_float(row["kibou_kouri_pr"])]  # 浮動小数点値をクリーニング
+                        "value": [str(sanitize_value(row["kibou_kouri_pr"], "0"))]
+                    }
+                ],
+                "specification": [
+                    {
+                        "id": "j3d7jE0000289825",
+                        "key": "sample",
+                        "value": [""]
+                    }
+                ],
+                "tab1": [
+                    {
+                        "id": "j3d7jE0000289826",
+                        "key": "sample",
+                        "value": [""]
+                    }
+                ],
+                "relation": [
+                    {
+                        "id": "j3d7jE0000289833",
+                        "key": "関連商品",
+                        "value": [""]
                     }
                 ]
             }
@@ -109,17 +114,19 @@ def lambda_handler(event, context):
 
         payload = {"products": product_data}
 
-        # ステップ5: APIリクエストを送信
-        logger.info(f"APIリクエスト送信中: {post_api_url}")
+        # JSONをログに出力
+        logger.info(f"送信するJSONデータ: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+
+        # ステップ4: APIリクエストを送信
         response = requests.post(post_api_url, headers=headers, json=payload)
 
-        # ステップ6: APIレスポンスの処理
+        # ステップ5: APIレスポンスの処理
         if response.status_code == 200:
             logger.info(f"APIリクエスト成功: {response.json()}")
             return {"statusCode": 200, "body": json.dumps("APIリクエスト成功")}
         else:
             logger.error(f"APIリクエスト失敗: {response.status_code} - {response.text}")
-            return {"statusCode": response.status_code, "body": f"APIリクエスト失敗: {response.text}"}
+            return {"statusCode": response.status_code, "body": response.text}
 
     except Exception as e:
         logger.error(f"エラーが発生しました: {str(e)}")
