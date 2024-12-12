@@ -2,11 +2,27 @@ import json
 import logging
 import awswrangler as wr
 import requests
+import math
+import pandas as pd
 from botocore.exceptions import ClientError
 
 # ログ設定
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+def sanitize_value(value, default="default_value"):
+    """値をクリーニングし、欠損値をデフォルト値に置き換える"""
+    if pd.isna(value):  # PandasのNaNチェック
+        return default
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return default
+    return value
+
+def sanitize_float(value):
+    """浮動小数点値をクリーニング"""
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return 0  # 無効値を0に置き換え
+    return value
 
 def lambda_handler(event, context):
     try:
@@ -44,40 +60,48 @@ def lambda_handler(event, context):
             "ClientId": "75"
         }
 
+         # 各列の欠損値をデフォルト値で埋める
+        df.fillna({
+            "buturyu_cd": "default_id",          # 商品コードが空の場合のデフォルト値
+            "seihin_rkj": "default_name",        # 製品名が空の場合のデフォルト値
+            "seisiki_syohin_nm": "default_product",  # 正式商品名が空の場合のデフォルト値
+            "seisiki_syohin_ob": "default_english",  # 正式商品名（英表記）が空の場合のデフォルト値
+            "seihin_kj": "default_kanji",        # 製品名（漢字）が空の場合のデフォルト値
+            "kibou_kouri_pr": 0                  # 希望小売価格が空の場合は0
+        }, inplace=True)
+
         # ステップ4: POST用のJSONデータを構築
         product_data = []
         for _, row in df.iterrows():
             product = {
                 "category_id": "j3d7j0000021623",  # カテゴリID
-                "com_product_id": row["buturyu_cd"],  # CSVのbuturyu_cd列
-                "product_name": row["seihin_rkj"],  # 製品名（簡略版）
+                "com_product_id": sanitize_value(row["buturyu_cd"], "default_id"),  # 商品コード
+                "product_name": sanitize_value(row["seihin_rkj"], "default_name"),  # 製品名
                 "product_text": None,  # テキストがない場合はNone
                 "product_status": "1",  # ステータスを固定
-                "edit_status": "1",
-                "client_read_auth": None,
-                "client_write_auth": None,
-                "view_auth_group": "j3d7j_base",  # 権限グループ
-                "edit_auth_group": "j3d7j_base",
+                "edit_status": "1",    # 編集ステータス
+                "view_auth_group": "j3d7j_base",  # 権限グループ（表示）
+                "edit_auth_group": "j3d7j_base",  # 権限グループ（編集）
                 "basic": [
                     {
-                        "id": "j3d7jE0000289845",
+                        "id": "j3d7jE0000289845",  # 属性ID
                         "key": "正式商品名",
-                        "value": [row["seisiki_syohin_nm"]]  # 正式商品名
+                        "value": [sanitize_value(row["seisiki_syohin_nm"], "default_product")]  # 正式商品名の値
                     },
                     {
                         "id": "j3d7jE0000289846",
                         "key": "正式商品名英表記",
-                        "value": [row["seisiki_syohin_ob"]]  # 英語表記
+                        "value": [sanitize_value(row["seisiki_syohin_ob"], "default_english")]  # 英語表記
                     },
                     {
                         "id": "j3d7jE0000289847",
                         "key": "製品名漢字",
-                        "value": [row["seihin_kj"]]  # 製品名（漢字）
+                        "value": [sanitize_value(row["seihin_kj"], "default_kanji")]  # 製品名（漢字）
                     },
                     {
                         "id": "j3d7jE0000289853",
                         "key": "希望小売価格",
-                        "value": [row["kibou_kouri_pr"]]  # 希望小売価格
+                        "value": [sanitize_float(row["kibou_kouri_pr"])]  # 浮動小数点値をクリーニング
                     }
                 ]
             }
