@@ -54,9 +54,10 @@ def lambda_handler(event, context):
         post_api_url = "https://api.plapi-product.com/plapi/api/v1/products"  # 固定URL
 
         # ステップ2: APIトークンとヘッダーの設定
-        token = "Bearer your_api_token_here"  # トークンを適切に設定してください
+        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
         headers = {
             "Authorization": token,
+            "User-Agent": "test-agent",
             "Content-Type": "application/json",
             "ClientId": "75"
         }
@@ -71,6 +72,8 @@ def lambda_handler(event, context):
                 "product_text": "",
                 "product_status": "1",
                 "edit_status": "1",
+                "view_auth_group": "j3d7j_base",  # 権限グループ（表示）
+                "edit_auth_group": "j3d7j_base",  # 権限グループ（編集）
                 "client_read_auth": "",
                 "client_write_auth": "",
                 "basic": [
