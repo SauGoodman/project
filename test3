@@ -49,7 +49,9 @@ def lambda_handler(event, context):
         for i in range(0, len(data), chunk_size):
             chunk = data.iloc[i:i + chunk_size]
             buturyu_cd_list = chunk['buturyu_cd'].tolist()
-            joined_buturyu_cd = "&".join(buturyu_cd_list)
+
+            # Ensure each `buturyu_cd` is in its original string format
+            joined_buturyu_cd = "&".join([f"buturyu_cd={cd}" for cd in buturyu_cd_list])
             api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{joined_buturyu_cd}"
 
             logger.info(f"APIリクエスト送信中: {api_url}")
