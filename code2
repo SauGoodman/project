@@ -8,7 +8,7 @@ import pandas as pd
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def sanitize_value(value, default=""):
+def sanitize_value(value, default="default_value"):
     """値をクリーニングし、欠損値をデフォルト値に置き換える"""
     if pd.isna(value) or value == "":
         return default
@@ -29,14 +29,12 @@ def lambda_handler(event, context):
             return {"statusCode": 500, "body": f"CSVファイルの読み込みに失敗しました: {str(e)}"}
 
         # ステップ2: 必須フィールドの欠損値をチェック
-        df.fillna({
-            "product_id": "default_product_id",
-            "category_id": "default_category_id",  # category_id のデフォルト値
-            "product_name": "default_product_name"
-        }, inplace=True)
+        df["category_id"] = df["category_id"].apply(lambda x: sanitize_value(x, "default_category_id"))
+        df["product_id"] = df["product_id"].apply(lambda x: sanitize_value(x, "default_product_id"))
+        df["product_name"] = df["product_name"].apply(lambda x: sanitize_value(x, "default_product_name"))
 
-        # POSTリクエスト用のAPIエンドポイント
-        put_api_url = "https://api.plapi-product.com/plapi/api/v1/products"  # 固定URL
+        # PUTリクエスト用のAPIエンドポイント
+        put_api_url = "https://api.plapi-product.com/plapi/api/v1/products"
 
         # ステップ3: APIトークンとヘッダーの設定
         token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ..."
@@ -62,51 +60,30 @@ def lambda_handler(event, context):
                     "product_text": "",
                     "product_status": "1",
                     "edit_status": "1",
-                    "view_auth_group": "j3d7j_base",  # 権限グループ（表示）
-                    "edit_auth_group": "j3d7j_base",  # 権限グループ（編集）
+                    "view_auth_group": "j3d7j_base",
+                    "edit_auth_group": "j3d7j_base",
                     "client_read_auth": "",
                     "client_write_auth": "",
                     "basic": [
                         {
                             "id": "j3d7jE0000289845",
                             "key": "正式商品名",
-                            "value": [sanitize_value(row["seisiki_syohin_nm"], "default_product")]
+                            "value": [sanitize_value(row.get("seisiki_syohin_nm"), "default_product")]
                         },
                         {
                             "id": "j3d7jE0000289846",
                             "key": "正式商品名英名",
-                            "value": [sanitize_value(row["seisiki_syohin_ob"], "default_english")]
+                            "value": [sanitize_value(row.get("seisiki_syohin_ob"), "default_english")]
                         },
                         {
                             "id": "j3d7jE0000289847",
                             "key": "製品名称漢字",
-                            "value": [sanitize_value(row["seihin_kj"], "default_kanji")]
+                            "value": [sanitize_value(row.get("seihin_kj"), "default_kanji")]
                         },
                         {
                             "id": "j3d7jE0000289853",
                             "key": "希望小売価格",
-                            "value": [sanitize_value(row["kibou_kouri_pr"], "0")]
-                        }
-                    ],
-                    "specification": [
-                        {
-                            "id": "j3d7jE0000289825",
-                            "key": "sample",
-                            "value": [""]
-                        }
-                    ],
-                    "tab1": [
-                        {
-                            "id": "j3d7jE0000289826",
-                            "key": "sample",
-                            "value": [""]
-                        }
-                    ],
-                    "relation": [
-                        {
-                            "id": "j3d7jE0000289833",
-                            "key": "関連商品",
-                            "value": [""]
+                            "value": [sanitize_value(row.get("kibou_kouri_pr"), "0")]
                         }
                     ]
                 }
