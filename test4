@@ -2,33 +2,59 @@ import awswrangler as wr
 
 def lambda_handler(event, context):
 
+    # キー列の名前
     key_column = 'buturyu_cd'
 
-    #製品情報マスタ
-    new_df1 = wr.s3.read_csv(f's3://mastergpoc/input/01_product_new.csv')
-    old_df1 = wr.s3.read_csv(f's3://mastergpoc/input/01_product_old.csv')
+    # 製品情報マスタの差分処理
+    new_df1 = wr.s3.read_csv(
+        f's3://mastergpoc/input/01_product_new.csv', 
+        dtype=str,  # すべての列を文字列型で読み込む
+        keep_default_na=False  # 空白セルを空文字列として扱う
+    )
+    old_df1 = wr.s3.read_csv(
+        f's3://mastergpoc/input/01_product_old.csv', 
+        dtype=str, 
+        keep_default_na=False
+    )
     diff_df1 = wr.pandas.concat([new_df1, old_df1]).drop_duplicates(keep=False)
-    diff_keys_df1 = diff_df1[[key_column]]
+    diff_keys_df1 = diff_df1[[key_column]]  # 差分キーのみ抽出
 
-    #使用品種情報マスタ
-    new_df2 = wr.s3.read_csv(f's3://mastergpoc/input/08_contain_new.csv')
-    old_df2 = wr.s3.read_csv(f's3://mastergpoc/input/08_contain_old.csv')
+    # 使用品種情報マスタの差分処理
+    new_df2 = wr.s3.read_csv(
+        f's3://mastergpoc/input/08_contain_new.csv', 
+        dtype=str, 
+        keep_default_na=False
+    )
+    old_df2 = wr.s3.read_csv(
+        f's3://mastergpoc/input/08_contain_old.csv', 
+        dtype=str, 
+        keep_default_na=False
+    )
     diff_df2 = wr.pandas.concat([new_df2, old_df2]).drop_duplicates(keep=False)
-    diff_keys_df2 = diff_df2[[key_column]]
-    
+    diff_keys_df2 = diff_df2[[key_column]]  # 差分キーのみ抽出
+
+    # 差分キーを統合して一意なリストを作成
     merged_keys_df = wr.pandas.concat([diff_keys_df1, diff_keys_df2]).drop_duplicates().reset_index(drop=True)
 
-    target_df1 = wr.s3.read_csv(f's3://mastergpoc/input/01_product_new.csv')
+    # 製品情報の差分対象データを抽出してS3に保存
+    target_df1 = wr.s3.read_csv(
+        f's3://mastergpoc/input/01_product_new.csv', 
+        dtype=str, 
+        keep_default_na=False
+    )
     result_df1 = target_df1[target_df1[key_column].isin(merged_keys_df[key_column])]
     wr.s3.to_csv(result_df1, f's3://mastergpoc/temp/01_product_compare.csv', index=False)
 
-    target_df2 = wr.s3.read_csv(f's3://mastergpoc/input/08_contain_new.csv')
+    # 使用品種情報の差分対象データを抽出してS3に保存
+    target_df2 = wr.s3.read_csv(
+        f's3://mastergpoc/input/08_contain_new.csv', 
+        dtype=str, 
+        keep_default_na=False
+    )
     result_df2 = target_df2[target_df2[key_column].isin(merged_keys_df[key_column])]
     wr.s3.to_csv(result_df2, f's3://mastergpoc/temp/08_contain_compare.csv', index=False)
-    
+
     return {
         'statusCode': 200,
-        'body': 'test ok'
+        'body': '処理が正常に完了しました'
     }
-
-    # test
