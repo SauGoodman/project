@@ -17,7 +17,7 @@ def lambda_handler(event, context):
         post_file_key = "results/01_product_apipost.csv"  # POST用結果ファイルのS3パス
         put_file_key = "results/01_product_apiput.csv"  # PUT用結果ファイルのS3パス
 
-        logger.info(f"S3からファイルを文字列型で読み込み中: s3://{bucket_name}/{input_file_key}")
+        logger.info(f"S3からCSVファイルを文字列型で読み込み中: s3://{bucket_name}/{input_file_key}")
 
         # CSVファイルの読み込み時にすべての列を文字列型に設定
         try:
@@ -30,21 +30,18 @@ def lambda_handler(event, context):
             logger.error(f"S3ファイルの読み込みに失敗しました: {str(e)}")
             return {"statusCode": 500, "body": f"S3ファイルの読み込みに失敗しました: {str(e)}"}
 
-        # データ型の確認ログ出力
-        logger.info(f"読み込まれたデータ型: {data.dtypes}")
-
-        # 先頭ゼロ保持の確認用ログ
-        logger.info(f"先頭ゼロ確認用データ: {data[['buturyu_cd']].head()}")
+        logger.info(f"データの型確認: {data.dtypes}")
+        logger.info(f"読み込んだデータの先頭行: {data[['buturyu_cd']].head()}")
 
         # ステップ2: APIトークンとヘッダーの設定
-        token = "Bearer your_api_token_here"  # APIトークンは必要に応じて変更
+        token = "Bearer your_api_token_here"  # APIトークン
         headers = {
             "User-Agent": "test-agent",
             "Authorization": token,
             "ClientId": "75"
         }
 
-        # ステップ3: APIリクエストの送信（100レコードごとの分割処理）
+        # ステップ3: APIリクエストの送信 (100レコードごと)
         chunk_size = 100
         post_df_list = []
         put_df_list = []
@@ -72,21 +69,23 @@ def lambda_handler(event, context):
             errors = api_data.get("errors", [])
             templates = api_data.get("templates", [])
 
+            # POST と PUT のデータ分割
             error_ids = {str(error["com_product_id"]) for error in errors}
             template_dict = {str(template["com_product_id"]): template["product_id"] for template in templates}
 
-            # POSTとPUTデータに分割
+            # POSTデータフレーム作成
             post_df = chunk[chunk["buturyu_cd"].isin(error_ids)]
+            if not post_df.empty:
+                post_df_list.append(post_df)
+
+            # PUTデータフレーム作成
             put_df = chunk[chunk["buturyu_cd"].isin(template_dict.keys())]
+            if not put_df.empty:
+                put_df["product_id"] = put_df["buturyu_cd"].map(template_dict)
+                put_df = put_df[["product_id"] + list(data.columns)]
+                put_df_list.append(put_df)
 
-            # PUTデータにproduct_idを追加
-            put_df["product_id"] = put_df["buturyu_cd"].map(template_dict)
-            put_df = put_df[["product_id"] + list(data.columns)]
-
-            post_df_list.append(post_df)
-            put_df_list.append(put_df)
-
-        # 結果を結合
+        # 結果の結合
         post_df = pd.concat(post_df_list, ignore_index=True) if post_df_list else pd.DataFrame()
         put_df = pd.concat(put_df_list, ignore_index=True) if put_df_list else pd.DataFrame()
 
