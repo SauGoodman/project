@@ -16,6 +16,7 @@ def lambda_handler(event, context):
         dtype=str, 
         keep_default_na=False
     )
+    # 差分を取得
     diff_df1 = wr.pandas.concat([new_df1, old_df1]).drop_duplicates(keep=False)
     diff_keys_df1 = diff_df1[[key_column]]  # 差分キーのみ抽出
 
@@ -30,6 +31,7 @@ def lambda_handler(event, context):
         dtype=str, 
         keep_default_na=False
     )
+    # 差分を取得
     diff_df2 = wr.pandas.concat([new_df2, old_df2]).drop_duplicates(keep=False)
     diff_keys_df2 = diff_df2[[key_column]]  # 差分キーのみ抽出
 
@@ -42,6 +44,7 @@ def lambda_handler(event, context):
         dtype=str, 
         keep_default_na=False
     )
+    # 差分キーを使用してフィルタリング
     result_df1 = target_df1[target_df1[key_column].isin(merged_keys_df[key_column])]
     wr.s3.to_csv(result_df1, f's3://mastergpoc/temp/01_product_compare.csv', index=False)
 
@@ -51,6 +54,7 @@ def lambda_handler(event, context):
         dtype=str, 
         keep_default_na=False
     )
+    # 差分キーを使用してフィルタリング
     result_df2 = target_df2[target_df2[key_column].isin(merged_keys_df[key_column])]
     wr.s3.to_csv(result_df2, f's3://mastergpoc/temp/08_contain_compare.csv', index=False)
 
