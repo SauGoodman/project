@@ -35,12 +35,13 @@ def lambda_handler(event, context):
 
         # データの欠損値をデフォルト値で埋める
         df.fillna({
-            "product_id": "default_product_id",  # 商品IDが空の場合のデフォルト値
-            "seihin_rkj": "default_name",       # 製品名が空の場合のデフォルト値
+            "product_id": "default_product_id",   # 商品IDが空の場合のデフォルト値
+            "category_id": "default_category_id", # カテゴリIDが空の場合のデフォルト値
+            "seihin_rkj": "default_name",        # 製品名が空の場合のデフォルト値
             "seisiki_syohin_nm": "default_product",  # 正式商品名が空の場合のデフォルト値
             "seisiki_syohin_ob": "default_english",  # 正式商品名（英表記）が空の場合のデフォルト値
-            "seihin_kj": "default_kanji",       # 製品名（漢字）が空の場合のデフォルト値
-            "kibou_kouri_pr": 0                 # 希望小売価格が空の場合は0
+            "seihin_kj": "default_kanji",        # 製品名（漢字）が空の場合のデフォルト値
+            "kibou_kouri_pr": 0                  # 希望小売価格が空の場合は0
         }, inplace=True)
 
         # PUTリクエスト用のAPIエンドポイント
@@ -55,7 +56,7 @@ def lambda_handler(event, context):
             "ClientId": "75"
         }
 
-        # ステップ3: PUT用のJSONデータを100件ごとに分割して送信
+        # ステップ3: PUT用のJSONデータを構築して送信
         chunk_size = 100
         for i in range(0, len(df), chunk_size):
             chunk = df.iloc[i:i+chunk_size]
@@ -64,6 +65,7 @@ def lambda_handler(event, context):
             for _, row in chunk.iterrows():
                 product = {
                     "product_id": str(sanitize_value(row["product_id"], "default_product_id")),
+                    "category_id": str(sanitize_value(row["category_id"], "default_category_id")),  # カテゴリIDを追加
                     "product_name": sanitize_value(row["seihin_rkj"], "default_name"),
                     "product_text": "",
                     "product_status": "1",
@@ -109,11 +111,4 @@ def lambda_handler(event, context):
             if response.status_code in [200, 201]:
                 logger.info(f"PUTリクエスト成功: {response.json()}")
             else:
-                logger.error(f"PUTリクエスト失敗: {response.status_code} - {response.text}")
-
-        logger.info("PUT処理が正常に完了しました。")
-        return {"statusCode": 200, "body": json.dumps("PUT処理が正常に完了しました。")}
-
-    except Exception as e:
-        logger.error(f"エラーが発生しました: {str(e)}")
-        return {"statusCode": 500, "body": f"エラー: {str(e)}"}
+                logger.error(f"PUTリクエスト
