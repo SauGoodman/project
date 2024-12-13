@@ -1,0 +1,34 @@
+import awswrangler as wr
+
+def lambda_handler(event, context):
+
+    key_column = 'buturyu_cd'
+
+    #製品情報マスタ
+    new_df1 = wr.s3.read_csv(f's3://mastergpoc/input/01_product_new.csv')
+    old_df1 = wr.s3.read_csv(f's3://mastergpoc/input/01_product_old.csv')
+    diff_df1 = wr.pandas.concat([new_df1, old_df1]).drop_duplicates(keep=False)
+    diff_keys_df1 = diff_df1[[key_column]]
+
+    #使用品種情報マスタ
+    new_df2 = wr.s3.read_csv(f's3://mastergpoc/input/08_contain_new.csv')
+    old_df2 = wr.s3.read_csv(f's3://mastergpoc/input/08_contain_old.csv')
+    diff_df2 = wr.pandas.concat([new_df2, old_df2]).drop_duplicates(keep=False)
+    diff_keys_df2 = diff_df2[[key_column]]
+    
+    merged_keys_df = wr.pandas.concat([diff_keys_df1, diff_keys_df2]).drop_duplicates().reset_index(drop=True)
+
+    target_df1 = wr.s3.read_csv(f's3://mastergpoc/input/01_product_new.csv')
+    result_df1 = target_df1[target_df1[key_column].isin(merged_keys_df[key_column])]
+    wr.s3.to_csv(result_df1, f's3://mastergpoc/temp/01_product_compare.csv', index=False)
+
+    target_df2 = wr.s3.read_csv(f's3://mastergpoc/input/08_contain_new.csv')
+    result_df2 = target_df2[target_df2[key_column].isin(merged_keys_df[key_column])]
+    wr.s3.to_csv(result_df2, f's3://mastergpoc/temp/08_contain_compare.csv', index=False)
+    
+    return {
+        'statusCode': 200,
+        'body': 'test ok'
+    }
+
+    # test
