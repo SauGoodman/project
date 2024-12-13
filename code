@@ -3,15 +3,10 @@ import logging
 import awswrangler as wr
 import requests
 import pandas as pd
-import boto3
-from botocore.exceptions import ClientError
 
 # ログ設定
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-# DynamoDB テーブル名
-DYNAMO_TABLE_NAME = "RequestCount"
 
 def sanitize_value(value, default="default_value"):
     """値をクリーニングし、欠損値をデフォルト値に置き換える"""
@@ -19,90 +14,84 @@ def sanitize_value(value, default="default_value"):
         return default
     return str(value)  # 必ず文字列に変換
 
-def get_last_processed_count(request_type):
-    """DynamoDBから最後に処理した件数を取得する"""
-    dynamodb = boto3.client('dynamodb')
+def lambda_handler(event, context):
     try:
-        response = dynamodb.get_item(
-            TableName=DYNAMO_TABLE_NAME,
-            Key={'RequestType': {'S': request_type}}
-        )
-        if 'Item' in response:
-            return int(response['Item']['ProcessedCount']['N'])
-        else:
-            return 0
-    except ClientError as e:
-        logger.error(f"DynamoDBからデータの取得に失敗しました: {e}")
-        return 0
+        bucket_name = "mastergpoc"
+        input_file_key = "results/01_product_apipost.csv"  # 入力CSVのS3キー
 
-def update_processed_count(request_type, count):
-    """DynamoDBに処理件数を更新する"""
-    dynamodb = boto3.client('dynamodb')
-    try:
-        dynamodb.put_item(
-            TableName=DYNAMO_TABLE_NAME,
-            Item={
-                'RequestType': {'S': request_type},
-                'ProcessedCount': {'N': str(count)}
-            }
-        )
-    except ClientError as e:
-        logger.error(f"DynamoDBへのデータ更新に失敗しました: {e}")
+        logger.info(f"S3からCSVファイルを読み込み中: s3://{bucket_name}/{input_file_key}")
 
-def process_post_data(df, bucket_name):
-    """POSTデータを処理する"""
+        # S3からCSVファイルを読み込む
+        try:
+            df = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}', dtype=str, keep_default_na=False)
+        except Exception as e:
+            logger.error(f"CSVファイルの読み込みに失敗しました: {str(e)}")
+            return {"statusCode": 500, "body": f"CSVファイルの読み込みに失敗しました: {str(e)}"}
+
+        logger.info(f"CSVファイルの読み込み成功: {df.head()}")
+
+        # `request_type`列が存在するか確認
+        if "request_type" not in df.columns:
+            error_msg = "CSVファイルに 'request_type' 列が存在しません。"
+            logger.error(error_msg)
+            return {"statusCode": 400, "body": error_msg}
+
+        # `request_type` 列の値をチェック（空値の処理）
+        if df["request_type"].isnull().any() or df["request_type"].eq("").any():
+            error_msg = "'request_type' 列に空値が含まれています。"
+            logger.error(error_msg)
+            return {"statusCode": 400, "body": error_msg}
+
+        # POST と PUT のデータを分割して処理
+        post_df = df[df["request_type"] == "POST"]
+        put_df = df[df["request_type"] == "PUT"]
+
+        logger.info(f"POSTデータ: {len(post_df)} 件, PUTデータ: {len(put_df)} 件")
+
+        # POSTデータを処理
+        if not post_df.empty:
+            process_post_data(post_df)
+
+        # PUTデータを処理
+        if not put_df.empty:
+            process_put_data(put_df)
+
+        return {"statusCode": 200, "body": "処理が正常に完了しました"}
+
+    except Exception as e:
+        logger.error(f"エラーが発生しました: {e}")
+        return {"statusCode": 500, "body": f"エラー: {e}"}
+
+def process_post_data(post_df):
+    """POSTデータを処理する関数"""
     post_api_url = "https://api.plapi-product.com/plapi/api/v1/products"
-    token = "Bearer your_api_token_here"  # APIトークン
     headers = {
         "User-Agent": "test-agent",
-        "Authorization": token,
+        "Authorization": "Bearer your_api_token_here",
         "ClientId": "75"
     }
-
+    
+    logger.info(f"POSTデータを処理中...（件数: {len(post_df)}）")
     batch_size = 100
-    total_records = len(df)
+    total_records = len(post_df)
+    
     for i in range(0, total_records, batch_size):
-        batch_df = df.iloc[i:i+batch_size]
+        batch_df = post_df.iloc[i:i+batch_size]
         product_data = []
 
         for _, row in batch_df.iterrows():
             product = {
                 "category_id": sanitize_value(row.get("category_id", "default_category_id")),
-                "com_product_id": sanitize_value(row.get("buturyu_cd", "default_id")),
-                "product_name": sanitize_value(row.get("product_name", "default_name")),
-                "product_text": "",
+                "product_name": sanitize_value(row.get("product_name", "default_product_name")),
                 "product_status": "1",
                 "edit_status": "1",
                 "view_auth_group": "j3d7j_base",
-                "edit_auth_group": "j3d7j_base",
-                "client_read_auth": "",
-                "client_write_auth": "",
-                "basic": [
-                    {
-                        "id": "j3d7jE0000289845",
-                        "key": "正式商品名",
-                        "value": [sanitize_value(row.get("seisiki_syohin_nm", "default_product"))]
-                    },
-                    {
-                        "id": "j3d7jE0000289846",
-                        "key": "正式商品名英名",
-                        "value": [sanitize_value(row.get("seisiki_syohin_ob", "default_english"))]
-                    },
-                    {
-                        "id": "j3d7jE0000289847",
-                        "key": "製品名称漢字",
-                        "value": [sanitize_value(row.get("seihin_kj", "default_kanji"))]
-                    },
-                    {
-                        "id": "j3d7jE0000289853",
-                        "key": "希望小売価格",
-                        "value": [sanitize_value(row.get("kibou_kouri_pr", "0"))]
-                    }
-                ]
+                "edit_auth_group": "j3d7j_base"
             }
             product_data.append(product)
 
         payload = {"products": product_data}
+        logger.info(f"POST用ペイロード: {json.dumps(payload, ensure_ascii=False, indent=2)}")
         response = requests.post(post_api_url, headers=headers, json=payload)
 
         if response.status_code == 200:
@@ -110,87 +99,40 @@ def process_post_data(df, bucket_name):
         else:
             logger.error(f"POSTリクエスト失敗: {response.status_code} - {response.text}")
 
-def process_put_data(df, bucket_name):
-    """PUTデータを処理する"""
+def process_put_data(put_df):
+    """PUTデータを処理する関数"""
     put_api_url = "https://api.plapi-product.com/plapi/api/v1/products"
-    token = "Bearer your_api_token_here"  # APIトークン
     headers = {
         "User-Agent": "test-agent",
-        "Authorization": token,
+        "Authorization": "Bearer your_api_token_here",
         "ClientId": "75"
     }
-
+    
+    logger.info(f"PUTデータを処理中...（件数: {len(put_df)}）")
     batch_size = 100
-    total_records = len(df)
+    total_records = len(put_df)
+
     for i in range(0, total_records, batch_size):
-        batch_df = df.iloc[i:i+batch_size]
+        batch_df = put_df.iloc[i:i+batch_size]
         product_data = []
 
         for _, row in batch_df.iterrows():
             product = {
                 "product_id": sanitize_value(row.get("product_id", "default_product_id")),
                 "category_id": sanitize_value(row.get("category_id", "default_category_id")),
-                "product_name": sanitize_value(row.get("product_name", "default_name")),
-                "product_text": "",
+                "product_name": sanitize_value(row.get("product_name", "default_product_name")),
                 "product_status": "1",
                 "edit_status": "1",
                 "view_auth_group": "j3d7j_base",
-                "edit_auth_group": "j3d7j_base",
-                "client_read_auth": "",
-                "client_write_auth": "",
-                "basic": [
-                    {
-                        "id": "j3d7jE0000289845",
-                        "key": "正式商品名",
-                        "value": [sanitize_value(row.get("seisiki_syohin_nm", "default_product"))]
-                    },
-                    {
-                        "id": "j3d7jE0000289846",
-                        "key": "正式商品名英名",
-                        "value": [sanitize_value(row.get("seisiki_syohin_ob", "default_english"))]
-                    },
-                    {
-                        "id": "j3d7jE0000289847",
-                        "key": "製品名称漢字",
-                        "value": [sanitize_value(row.get("seihin_kj", "default_kanji"))]
-                    },
-                    {
-                        "id": "j3d7jE0000289853",
-                        "key": "希望小売価格",
-                        "value": [sanitize_value(row.get("kibou_kouri_pr", "0"))]
-                    }
-                ]
+                "edit_auth_group": "j3d7j_base"
             }
             product_data.append(product)
 
         payload = {"products": product_data}
+        logger.info(f"PUT用ペイロード: {json.dumps(payload, ensure_ascii=False, indent=2)}")
         response = requests.put(put_api_url, headers=headers, json=payload)
 
         if response.status_code == 200:
             logger.info(f"PUTリクエスト成功: {response.json()}")
         else:
             logger.error(f"PUTリクエスト失敗: {response.status_code} - {response.text}")
-
-def lambda_handler(event, context):
-    try:
-        bucket_name = "mastergpoc"
-        input_file_key = "results/01_product_apipost.csv"
-
-        df = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}', dtype=str, keep_default_na=False)
-        logger.info("CSVファイルの読み込み成功")
-
-        # POST と PUT のデータを分割して処理
-        post_df = df[df["request_type"] == "POST"]
-        put_df = df[df["request_type"] == "PUT"]
-
-        if not post_df.empty:
-            process_post_data(post_df, bucket_name)
-
-        if not put_df.empty:
-            process_put_data(put_df, bucket_name)
-
-        return {"statusCode": 200, "body": "処理が正常に完了しました"}
-
-    except Exception as e:
-        logger.error(f"エラーが発生しました: {e}")
-        return {"statusCode": 500, "body": f"エラー: {e}"}
