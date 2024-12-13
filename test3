@@ -19,33 +19,43 @@ def lambda_handler(event, context):
 
         logger.info(f"S3からファイルを読み込み中: s3://{bucket_name}/{input_file_key}")
 
-        # S3からCSVファイルの読み込み
+        # CSVファイルの読み込み時に特定の列を文字列型に設定
         try:
-            data = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}')
+            data = wr.s3.read_csv(
+                f's3://{bucket_name}/{input_file_key}',
+                dtype={"buturyu_cd": str}  # 'buturyu_cd'列を文字列として読み込む
+            )
         except ClientError as e:
             logger.error(f"S3ファイルの読み込みに失敗しました: {str(e)}")
             return {"statusCode": 500, "body": f"S3ファイルの読み込みに失敗しました: {str(e)}"}
 
+        # データ型の確認ログ出力
+        logger.info(f"データ型確認: {data.dtypes}")
+
+        # 先頭ゼロが消えないように明示的に文字列変換を強制
+        data["buturyu_cd"] = data["buturyu_cd"].astype(str).str.zfill(5)
+
+        logger.info(f"ゼロ埋め後のデータサンプル: {data[['buturyu_cd']].head()}")
+
         # ステップ2: APIトークンとヘッダーの設定
-        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
+        token = "Bearer your_api_token_here"  # APIトークンは必要に応じて変更
         headers = {
             "User-Agent": "test-agent",
             "Authorization": token,
             "ClientId": "75"
         }
 
-        # ステップ3: 100レコードごとにAPIリクエストを分割
-        chunk_size = 100  # 1回のリクエストあたりのレコード数
+        # ステップ3: APIリクエストの送信（100レコードごとの分割処理）
+        chunk_size = 100
         post_df_list = []
         put_df_list = []
 
         for i in range(0, len(data), chunk_size):
-            chunk = data.iloc[i:i+chunk_size]
+            chunk = data.iloc[i:i + chunk_size]
             buturyu_cd_list = chunk['buturyu_cd'].tolist()
             joined_buturyu_cd = "&".join(map(str, buturyu_cd_list))
             api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{joined_buturyu_cd}"
 
-            # APIリクエストの送信
             logger.info(f"APIリクエスト送信中: {api_url}")
             response = requests.get(api_url, headers=headers)
 
