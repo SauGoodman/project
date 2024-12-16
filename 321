@@ -1,18 +1,118 @@
+import json
+import logging
+import awswrangler as wr
+import requests
+import pandas as pd
 import boto3
+from botocore.exceptions import ClientError
 
+# ログ設定
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# DynamoDB 設定
 dynamodb = boto3.resource('dynamodb')
+table_name = "RequestCount"  # DynamoDBのテーブル名
+request_count_table = dynamodb.Table(table_name)
 
-# テーブルを作成
-table_name = "RequestCount"
-table = dynamodb.create_table(
-    TableName=table_name,
-    KeySchema=[
-        {'AttributeName': 'RequestType', 'KeyType': 'HASH'}  # 分区キー
-    ],
-    AttributeDefinitions=[
-        {'AttributeName': 'RequestType', 'AttributeType': 'S'}  # 类型：String
-    ],
-    ProvisionedThroughput={'ReadCapacityUnits': 5, 'WriteCapacityUnits': 5}
-)
+# APIトークンとヘッダの設定
+token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv..."
+headers = {
+    "User-Agent": "test-agent",
+    "Authorization": token,
+    "ClientId": "75"
+}
 
-print(f"テーブル '{table_name}' が作成されました")
+# データをクリーニングする関数
+def sanitize_value(value, default="default_value"):
+    """値をクリーニングし、欠損値をデフォルト値に置き換える"""
+    if pd.isna(value) or value == "":
+        return default
+    return str(value)
+
+# DynamoDBから前回の処理件数を取得する関数
+def get_last_processed_count(function_type):
+    """DynamoDBから最後の処理件数を取得する"""
+    try:
+        response = request_count_table.get_item(Key={'FunctionType': function_type})
+        return int(response['Item']['RecCount']) if 'Item' in response else 0
+    except Exception as e:
+        logger.error(f"DynamoDB取得エラー: {e}")
+        return 0
+
+# DynamoDBに件数を更新する関数
+def update_request_count(function_type, count):
+    """DynamoDBにリクエスト件数を記録または更新する"""
+    try:
+        response = request_count_table.update_item(
+            Key={'FunctionType': function_type},
+            UpdateExpression="SET RecCount = :count",
+            ExpressionAttributeValues={':count': count},
+            ReturnValues="UPDATED_NEW"
+        )
+        logger.info(f"DynamoDBに記録: {response}")
+    except ClientError as e:
+        logger.error(f"DynamoDB更新エラー: {e}")
+
+# POSTデータを処理する関数
+def process_post_data(post_df):
+    """POSTデータを処理してAPIを呼び出す"""
+    post_api_url = "https://api.plapi-product.com/plapi/api/v1/products"
+    batch_size = 100
+    total_records = len(post_df)
+    
+    for i in range(0, total_records, batch_size):
+        batch_df = post_df.iloc[i:i+batch_size]
+        product_data = [{"category_id": sanitize_value(row.get("category_id")),
+                         "product_name": sanitize_value(row.get("product_name")),
+                         "product_status": "1",
+                         "edit_status": "1",
+                         "view_auth_group": "j3d7j_base",
+                         "edit_auth_group": "j3d7j_base"} for _, row in batch_df.iterrows()]
+
+        payload = {"products": product_data}
+        logger.info(f"POSTペイロード: {json.dumps(payload, ensure_ascii=False)}")
+        response = requests.post(post_api_url, headers=headers, json=payload)
+
+        if response.status_code == 200:
+            logger.info(f"POST成功: {response.json()}")
+        else:
+            logger.error(f"POST失敗: {response.status_code} - {response.text}")
+
+# PUTデータを処理する関数
+def process_put_data(put_df):
+    """PUTデータを処理してAPIを呼び出す"""
+    put_api_url = "https://api.plapi-product.com/plapi/api/v1/products"
+    batch_size = 100
+    total_records = len(put_df)
+
+    for i in range(0, total_records, batch_size):
+        batch_df = put_df.iloc[i:i+batch_size]
+        product_data = [{"product_id": sanitize_value(row.get("product_id")),
+                         "category_id": sanitize_value(row.get("category_id")),
+                         "product_name": sanitize_value(row.get("product_name")),
+                         "product_status": "1",
+                         "edit_status": "1",
+                         "view_auth_group": "j3d7j_base",
+                         "edit_auth_group": "j3d7j_base"} for _, row in batch_df.iterrows()]
+
+        payload = {"products": product_data}
+        logger.info(f"PUTペイロード: {json.dumps(payload, ensure_ascii=False)}")
+        response = requests.put(put_api_url, headers=headers, json=payload)
+
+        if response.status_code == 200:
+            logger.info(f"PUT成功: {response.json()}")
+        else:
+            logger.error(f"PUT失敗: {response.status_code} - {response.text}")
+
+# Lambdaハンドラー関数
+def lambda_handler(event, context):
+    try:
+        bucket_name = "mastergpoc"
+        input_file_key = "results/01_product_apipost.csv"
+
+        logger.info(f"S3ファイル読み込み: s3://{bucket_name}/{input_file_key}")
+        df = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}', dtype=str, keep_default_na=False)
+
+        # DynamoDBから前回の件数を取得
+        last_post
