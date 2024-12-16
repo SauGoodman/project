@@ -31,11 +31,11 @@ def sanitize_value(value, default="default_value"):
     return str(value)
 
 # DynamoDBから前回の処理件数を取得する関数
-def get_last_processed_count(method_type):
+def get_last_processed_count(function_type):
     """DynamoDBから最後の処理件数を取得する"""
     try:
-        logger.info(f"DynamoDBから件数取得: method_type={method_type}")
-        response = request_count_table.get_item(Key={'FunctionType': method_type})
+        logger.info(f"DynamoDBから件数取得: FunctionType={function_type}")
+        response = request_count_table.get_item(Key={'FunctionType': function_type})
         logger.info(f"DynamoDB Response: {response}")
         return int(response['Item']['RecCount']) if 'Item' in response else 0
     except Exception as e:
@@ -43,12 +43,12 @@ def get_last_processed_count(method_type):
         return 0
 
 # DynamoDBに件数を更新する関数
-def update_request_count(method_type, count):
+def update_request_count(function_type, count):
     """DynamoDBにリクエスト件数を記録または更新する"""
     try:
-        logger.info(f"DynamoDBに件数更新: method_type={method_type}, RecCount={count}")
+        logger.info(f"DynamoDBに件数更新: FunctionType={function_type}, RecCount={count}")
         response = request_count_table.update_item(
-            Key={'FunctionType': method_type},
+            Key={'FunctionType': function_type},
             UpdateExpression="SET RecCount = :count",
             ExpressionAttributeValues={':count': count},
             ReturnValues="UPDATED_NEW"
@@ -63,7 +63,7 @@ def process_post_data(post_df):
     post_api_url = "https://api.plapi-product.com/plapi/api/v1/products"
     batch_size = 100
     total_records = len(post_df)
-    
+
     for i in range(0, total_records, batch_size):
         batch_df = post_df.iloc[i:i+batch_size]
         product_data = [{"category_id": sanitize_value(row.get("category_id")),
@@ -112,31 +112,31 @@ def process_put_data(put_df):
 def lambda_handler(event, context):
     try:
         bucket_name = "mastergpoc"
-        input_file_key = "results/01_product_apipost.csv"
-
+        input_file_key = event.get("input_file_key", "")  # ファイル名をイベントから取得
         logger.info(f"S3ファイル読み込み: s3://{bucket_name}/{input_file_key}")
+
+        # CSVファイルの読み込み
         df = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}', dtype=str, keep_default_na=False)
         logger.info(f"読み込んだCSVの列: {df.columns}")
 
-        # DynamoDBから前回の件数を取得
-        last_post_count = get_last_processed_count("post")
-        last_put_count = get_last_processed_count("getProductId")
-
-        # method_type でデータをフィルタリング
-        post_df = df[df["method_type"] == "post"].iloc[last_post_count:]
-        put_df = df[df["method_type"] == "getProductId"].iloc[last_put_count:]
-
-        logger.info(f"POSTデータ: {len(post_df)} 件, PUTデータ: {len(put_df)} 件")
-
-        # POSTデータを処理
-        if not post_df.empty:
-            process_post_data(post_df)
-            update_request_count("post", last_post_count + len(post_df))
-
-        # PUTデータを処理
-        if not put_df.empty:
-            process_put_data(put_df)
-            update_request_count("getProductId", last_put_count + len(put_df))
+        # 処理の種類をファイル名から判定
+        if "apipost" in input_file_key:
+            function_type = "POST"
+            last_count = get_last_processed_count("POST")
+            filtered_df = df.iloc[last_count:]
+            logger.info(f"POSTデータ: {len(filtered_df)} 件")
+            process_post_data(filtered_df)
+            update_request_count("POST", last_count + len(filtered_df))
+        elif "apiput" in input_file_key:
+            function_type = "PUT"
+            last_count = get_last_processed_count("PUT")
+            filtered_df = df.iloc[last_count:]
+            logger.info(f"PUTデータ: {len(filtered_df)} 件")
+            process_put_data(filtered_df)
+            update_request_count("PUT", last_count + len(filtered_df))
+        else:
+            logger.error("無効なファイル名です。POSTまたはPUTの処理が必要です。")
+            return {"statusCode": 400, "body": "無効なファイル名です。"}
 
         return {"statusCode": 200, "body": "処理が正常に完了しました"}
 
