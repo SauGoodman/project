@@ -75,7 +75,8 @@ def lambda_handler(event, context):
         elif input_file_key.endswith(".csv"):
             df = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}', dtype=str, keep_default_na=False)
         else:
-            raise ValueError("サポートされていないファイル形式です。")
+            logger.error(f"サポートされていないファイル形式: {input_file_key}")
+            return {"statusCode": 400, "body": f"エラー: サポートされていないファイル形式です: {input_file_key}"}
 
         logger.info(f"読み込んだCSVの列: {df.columns}")
 
@@ -94,7 +95,7 @@ def lambda_handler(event, context):
             update_request_count("PUT", last_count + len(filtered_df))
         else:
             logger.error("無効なファイル名です。POSTまたはPUTの処理が必要です。")
-            return {"statusCode": 400, "body": "無効なファイル名です。"}
+            return {"statusCode": 400, "body": "無効なファイル名です。POSTまたはPUTが含まれていません。"}
 
         return {"statusCode": 200, "body": "処理が正常に完了しました"}
 
