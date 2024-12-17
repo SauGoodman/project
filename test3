@@ -1,6 +1,6 @@
 import json
 import logging
-import awswrangler as wr
+import awswrangler as wr  # 确保 awswrangler 已通过 Lambda 层或本地打包导入
 import requests
 import pandas as pd
 import boto3
@@ -11,34 +11,34 @@ from time import sleep
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# --- DynamoDB 設定 ---
+# --- AWS 资源配置 ---
 dynamodb = boto3.resource('dynamodb')
-table_name = "RequestCount"
+table_name = "RequestCount"  # DynamoDB 表名
 request_count_table = dynamodb.Table(table_name)
 
-# --- API設定 ---
+# --- API 配置 ---
 API_URL = "https://api.plapi-product.com/plapi/api/v1/products"
-TOKEN = "Bearer <YOUR_API_TOKEN>"  # API トークンを設定
+TOKEN = "Bearer <YOUR_API_TOKEN>"  # 替换为实际 API Token
 HEADERS = {
     "User-Agent": "test-agent",
     "Authorization": TOKEN,
     "ClientId": "75"
 }
 
-BATCH_SIZE = 100  # バッチサイズ
+BATCH_SIZE = 100  # 每批次处理的数据条数
 
 # --- DynamoDB 操作 ---
 def get_last_processed_count(method_type):
-    """DynamoDBから処理済み件数を取得"""
+    """获取 DynamoDB 中上次处理的记录数"""
     try:
         response = request_count_table.get_item(Key={"FunctionType": method_type})
         return int(response['Item']['RecCount']) if 'Item' in response else 0
     except Exception as e:
-        logger.error(f"DynamoDB取得エラー: {e}")
+        logger.error(f"DynamoDB 读取错误: {e}")
         return 0
 
 def update_request_count(method_type, count):
-    """DynamoDBに処理件数を更新"""
+    """更新 DynamoDB 中的处理记录数"""
     try:
         request_count_table.update_item(
             Key={"FunctionType": method_type},
@@ -46,11 +46,11 @@ def update_request_count(method_type, count):
             ExpressionAttributeValues={":count": count}
         )
     except Exception as e:
-        logger.error(f"DynamoDB更新エラー: {e}")
+        logger.error(f"DynamoDB 更新错误: {e}")
 
-# --- POSTデータを処理 ---
+# --- POST 数据处理 ---
 def process_post_data(post_df, put_file_path):
-    """POSTデータを処理し、PUT用データを保存"""
+    """处理 POST 请求并生成 PUT 数据文件"""
     response_list = []
     for i in range(0, len(post_df), BATCH_SIZE):
         batch_df = post_df.iloc[i:i + BATCH_SIZE]
@@ -67,19 +67,19 @@ def process_post_data(post_df, put_file_path):
         try:
             response = requests.post(API_URL, headers=HEADERS, json=payload)
             if response.status_code == 200:
-                logger.info(f"POST成功: {response.json()}")
+                logger.info(f"POST 成功: {response.json()}")
                 response_list.append(response.json())
             else:
-                logger.error(f"POST失敗: {response.status_code}, {response.text}")
+                logger.error(f"POST 失败: {response.status_code}, {response.text}")
         except Exception as e:
-            logger.error(f"POSTエラー: {e}")
-        sleep(1)
-    
-    # 保存 PUT データ
+            logger.error(f"POST 请求错误: {e}")
+        sleep(1)  # 防止速率过快
+
+    # 保存 PUT 数据文件
     save_post_response_to_put_file(post_df, response_list, put_file_path)
 
 def save_post_response_to_put_file(post_df, response_list, put_file_path):
-    """POSTのレスポンスからProductIdを抽出し、PUTデータファイルを生成"""
+    """保存 POST 响应为 PUT 数据文件"""
     put_data = []
     for i, response in enumerate(response_list):
         if response and 'products' in response:
@@ -90,37 +90,37 @@ def save_post_response_to_put_file(post_df, response_list, put_file_path):
                     "product_name": post_df.iloc[i]["product_name"],
                     "product_status": "1"
                 })
-    # CSVとして保存
     put_df = pd.DataFrame(put_data)
     put_df.to_csv(put_file_path, index=False)
-    logger.info(f"PUTデータファイルが作成されました: {put_file_path}")
+    logger.info(f"PUT 数据文件已创建: {put_file_path}")
 
-# --- Lambdaハンドラー ---
+# --- Lambda 处理函数 ---
 def lambda_handler(event, context):
     bucket_name = "mastergpoc"
     input_file_key_post = "results/01_product_apipost.csv"
-    output_file_key_put = "/tmp/01_product_apiput.csv"
+    output_file_key_put = "/tmp/01_product_apiput.csv"  # 临时存储路径
     s3_output_key_put = "results/01_product_apiput.csv"
 
     try:
-        # --- POST処理 ---
-        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_post}")
+        # --- 读取 POST 数据 ---
+        logger.info(f"读取 S3 文件: s3://{bucket_name}/{input_file_key_post}")
         df_post = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_post}", dtype=str)
 
-        # DynamoDB から進捗取得
+        # --- 获取上次处理进度 ---
         last_post_count = get_last_processed_count("post")
         post_df = df_post.iloc[last_post_count:]
         if not post_df.empty:
-            logger.info(f"POST処理データ: {len(post_df)} 件")
+            logger.info(f"POST 数据处理开始: {len(post_df)} 条记录")
             process_post_data(post_df, output_file_key_put)
             update_request_count("post", last_post_count + len(post_df))
 
-        # PUT用データをS3にアップロード
+        # --- 上传 PUT 数据文件到 S3 ---
+        logger.info(f"上传 PUT 数据文件到 S3: s3://{bucket_name}/{s3_output_key_put}")
         wr.s3.upload(local_file=output_file_key_put, path=f"s3://{bucket_name}/{s3_output_key_put}")
-        logger.info(f"PUTデータファイルがS3にアップロードされました: {s3_output_key_put}")
+        logger.info("PUT 数据文件上传成功！")
 
-        return {"statusCode": 200, "body": "POST処理が完了し、PUTデータが準備されました"}
+        return {"statusCode": 200, "body": "POST 处理完成，PUT 数据已生成并上传到 S3"}
 
     except Exception as e:
-        logger.error(f"エラーが発生しました: {e}")
-        return {"statusCode": 500, "body": f"エラー: {e}"}
+        logger.error(f"执行错误: {e}")
+        return {"statusCode": 500, "body": f"错误: {e}"}
