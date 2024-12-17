@@ -4,100 +4,128 @@ import awswrangler as wr
 import requests
 import pandas as pd
 import boto3
-import zipfile
-import io
 from botocore.exceptions import ClientError
+from time import sleep
 
-# ログ設定
+# --- ログ設定 ---
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# DynamoDB 設定
+# --- DynamoDB 設定 ---
 dynamodb = boto3.resource('dynamodb')
 table_name = "RequestCount"
 request_count_table = dynamodb.Table(table_name)
 
-# S3 クライアント
-s3 = boto3.client('s3')
-
-# APIトークンとヘッダの設定
-token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9..."
-headers = {
+# --- API設定 ---
+API_BASE_URL = "https://api.plapi-product.com/plapi/api/v1/products"
+HEADERS = {
     "User-Agent": "test-agent",
-    "Authorization": token,
+    "Authorization": "Bearer <新しいAPIトークン>",  # トークンはここに設定
     "ClientId": "75"
 }
 
-# DynamoDB関連関数
-def get_last_processed_count(function_type):
+BATCH_SIZE = 100  # APIリクエストのバッチサイズ
+
+# --- DynamoDB操作 ---
+def get_last_processed_count(method_type):
     try:
-        logger.info(f"DynamoDBから件数取得: FunctionType={function_type}")
-        response = request_count_table.get_item(Key={'FunctionType': function_type})
+        response = request_count_table.get_item(Key={"FunctionType": method_type})
         return int(response['Item']['RecCount']) if 'Item' in response else 0
     except Exception as e:
         logger.error(f"DynamoDB取得エラー: {e}")
         return 0
 
-def update_request_count(function_type, count):
+def update_request_count(method_type, count):
     try:
-        logger.info(f"DynamoDBに件数更新: FunctionType={function_type}, RecCount={count}")
         request_count_table.update_item(
-            Key={'FunctionType': function_type},
+            Key={"FunctionType": method_type},
             UpdateExpression="SET RecCount = :count",
-            ExpressionAttributeValues={':count': count}
+            ExpressionAttributeValues={":count": count}
         )
-    except ClientError as e:
+    except Exception as e:
         logger.error(f"DynamoDB更新エラー: {e}")
 
-# ZIP ファイルの処理
-def extract_csv_from_zip(bucket_name, file_key):
-    logger.info(f"ZIPファイルを解凍: {file_key}")
-    response = s3.get_object(Bucket=bucket_name, Key=file_key)
-    with zipfile.ZipFile(io.BytesIO(response['Body'].read())) as z:
-        # 1つのCSVファイルのみを処理
-        for file in z.namelist():
-            if file.endswith(".csv"):
-                logger.info(f"CSVファイルを抽出: {file}")
-                with z.open(file) as f:
-                    return pd.read_csv(f, dtype=str)
-    raise ValueError("ZIPファイル内にCSVファイルが見つかりません。")
-
-# Lambdaハンドラー関数
-def lambda_handler(event, context):
+# --- GET操作 (ProductId確認) ---
+def check_product_id(product_id):
     try:
-        bucket_name = "mastergpoc"
-        input_file_key = event.get("input_file_key", "")  # イベントからファイルキーを取得
-        logger.info(f"S3ファイル読み込み: s3://{bucket_name}/{input_file_key}")
+        response = requests.get(f"{API_BASE_URL}/{product_id}", headers=HEADERS)
+        return response.status_code == 200  # 存在する場合 True
+    except Exception as e:
+        logger.error(f"GETエラー: {e}")
+        return False
 
-        # ファイルの種類を判定して読み込み
-        if input_file_key.endswith(".zip"):
-            df = extract_csv_from_zip(bucket_name, input_file_key)
-        elif input_file_key.endswith(".csv"):
-            df = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}', dtype=str, keep_default_na=False)
-        else:
-            logger.error(f"サポートされていないファイル形式: {input_file_key}")
-            return {"statusCode": 400, "body": f"エラー: サポートされていないファイル形式です: {input_file_key}"}
+# --- POSTデータを処理 ---
+def process_post_data(post_df):
+    for i in range(0, len(post_df), BATCH_SIZE):
+        batch_df = post_df.iloc[i:i + BATCH_SIZE]
+        payload = {
+            "products": [
+                {
+                    "category_id": row.get("category_id", "default"),
+                    "product_name": row.get("product_name", "default"),
+                    "product_status": "1"
+                }
+                for _, row in batch_df.iterrows()
+            ]
+        }
+        try:
+            response = requests.post(API_BASE_URL, headers=HEADERS, json=payload)
+            logger.info(f"POST結果: {response.status_code}, 内容: {response.json()}")
+        except Exception as e:
+            logger.error(f"POSTエラー: {e}")
+        sleep(1)
 
-        logger.info(f"読み込んだCSVの列: {df.columns}")
+# --- PUTデータを処理 ---
+def process_put_data(put_df):
+    for i in range(0, len(put_df), BATCH_SIZE):
+        batch_df = put_df.iloc[i:i + BATCH_SIZE]
+        payload = {
+            "products": [
+                {
+                    "product_id": row.get("product_id"),
+                    "category_id": row.get("category_id", "default"),
+                    "product_name": row.get("product_name", "default"),
+                    "product_status": "1"
+                }
+                for _, row in batch_df.iterrows()
+            ]
+        }
+        try:
+            response = requests.put(API_BASE_URL, headers=HEADERS, json=payload)
+            logger.info(f"PUT結果: {response.status_code}, 内容: {response.json()}")
+        except Exception as e:
+            logger.error(f"PUTエラー: {e}")
+        sleep(1)
 
-        # 処理の種類をファイル名から判定
-        if "apipost" in input_file_key:
-            function_type = "POST"
-            last_count = get_last_processed_count("POST")
-            filtered_df = df.iloc[last_count:]
-            logger.info(f"POSTデータ: {len(filtered_df)} 件")
-            update_request_count("POST", last_count + len(filtered_df))
-        elif "apiput" in input_file_key:
-            function_type = "PUT"
-            last_count = get_last_processed_count("PUT")
-            filtered_df = df.iloc[last_count:]
-            logger.info(f"PUTデータ: {len(filtered_df)} 件")
-            update_request_count("PUT", last_count + len(filtered_df))
-        else:
-            logger.error("無効なファイル名です。POSTまたはPUTの処理が必要です。")
-            return {"statusCode": 400, "body": "無効なファイル名です。POSTまたはPUTが含まれていません。"}
+# --- Lambdaハンドラー ---
+def lambda_handler(event, context):
+    bucket_name = "mastergpoc"
+    input_file_key = "results/01_product_apipost.csv"
 
-        return {"statusCode": 200, "body": "処理が正常に完了しました"}
+    try:
+        # S3からデータを取得
+        logger.info(f"S3読み込み: {bucket_name}/{input_file_key}")
+        df = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key}", dtype=str)
+
+        # DynamoDBから進捗取得
+        last_post_count = get_last_processed_count("post")
+        last_put_count = get_last_processed_count("put")
+
+        # POST対象のデータ
+        post_df = df[(df["method_type"] == "post")].iloc[last_post_count:]
+        if not post_df.empty:
+            logger.info(f"POST処理データ: {len(post_df)} 件")
+            process_post_data(post_df)
+            update_request_count("post", last_post_count + len(post_df))
+
+        # PUT対象のデータ
+        put_df = df[(df["method_type"] == "getProductId")].iloc[last_put_count:]
+        if not put_df.empty:
+            logger.info(f"PUT処理データ: {len(put_df)} 件")
+            process_put_data(put_df)
+            update_request_count("put", last_put_count + len(put_df))
+
+        return {"statusCode": 200, "body": "処理が完了しました"}
 
     except Exception as e:
         logger.error(f"エラーが発生しました: {e}")
