@@ -1,148 +1,19 @@
-import json
-import logging
-import awswrangler as wr
-import requests
 import pandas as pd
-import boto3
-from botocore.exceptions import ClientError
-from time import sleep
 
-# --- ログ設定 ---
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-# --- DynamoDB 設定 ---
-dynamodb = boto3.resource('dynamodb')
-table_name = "RequestCount"
-request_count_table = dynamodb.Table(table_name)
-
-# APIトークンとヘッダの設定
-token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
-headers = {
-    "User-Agent": "test-agent",
-    "Authorization": token,
-    "ClientId": "75"
+# 数据结构
+data = {
+    "buturyu_c": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10011],
+    "seisiki": ["該当製品" for _ in range(11)],
+    "seihinki": ["廠陳物品" for _ in range(11)],
+    "rkkibou": ["cc維" for _ in range(11)],
+    "kouri_pr": [10001, 10002, 10003, 10004, 10005, 10006, 10007, 10008, 10009, 10010, 10011],
 }
 
-BATCH_SIZE = 100  # APIリクエストのバッチサイズ
+# 创建 DataFrame
+df = pd.DataFrame(data)
 
-# --- DynamoDB操作 ---
-def get_last_processed_count(method_type):
-    try:
-        response = request_count_table.get_item(Key={"FunctionType": method_type})
-        return int(response['Item']['RecCount']) if 'Item' in response else 0
-    except Exception as e:
-        logger.error(f"DynamoDB取得エラー: {e}")
-        return 0
+# 保存为 CSV 文件
+output_file = "01_product_apiput.csv"
+df.to_csv(output_file, index=False, encoding="utf-8-sig")  # 保存为 UTF-8 编码的 CSV 文件
 
-def update_request_count(method_type, count):
-    try:
-        request_count_table.update_item(
-            Key={"FunctionType": method_type},
-            UpdateExpression="SET RecCount = :count",
-            ExpressionAttributeValues={":count": count}
-        )
-    except Exception as e:
-        logger.error(f"DynamoDB更新エラー: {e}")
-
-# --- GET操作 (ProductId確認) ---
-def check_product_id(product_id):
-    try:
-        response = requests.get(f"{API_BASE_URL}/{product_id}", headers=HEADERS)
-        return response.status_code == 200  # 存在する場合 True
-    except Exception as e:
-        logger.error(f"GETエラー: {e}")
-        return False
-
-# --- POSTデータを処理 ---
-def process_post_data(post_df):
-    for i in range(0, len(post_df), BATCH_SIZE):
-        batch_df = post_df.iloc[i:i + BATCH_SIZE]
-        payload = {
-            "products": [
-                {
-                    "category_id": row.get("category_id", "default"),
-                    "product_name": row.get("product_name", "default"),
-                    "product_status": "1"
-                }
-                for _, row in batch_df.iterrows()
-            ]
-        }
-        try:
-            response = requests.post(API_BASE_URL, headers=HEADERS, json=payload)
-            logger.info(f"POST結果: {response.status_code}, 内容: {response.json()}")
-        except Exception as e:
-            logger.error(f"POSTエラー: {e}")
-        sleep(1)
-
-# --- PUTデータを処理 ---
-def process_put_data(put_df):
-    for i in range(0, len(put_df), BATCH_SIZE):
-        batch_df = put_df.iloc[i:i + BATCH_SIZE]
-        payload = {
-            "products": [
-                {
-                    "product_id": row.get("product_id"),
-                    "category_id": row.get("category_id", "default"),
-                    "product_name": row.get("product_name", "default"),
-                    "product_status": "1"
-                }
-                for _, row in batch_df.iterrows()
-            ]
-        }
-        try:
-            response = requests.put(API_BASE_URL, headers=HEADERS, json=payload)
-            logger.info(f"PUT結果: {response.status_code}, 内容: {response.json()}")
-        except Exception as e:
-            logger.error(f"PUTエラー: {e}")
-        sleep(1)
-
-# --- Lambdaハンドラー ---
-def lambda_handler(event, context):
-    bucket_name = "mastergpoc"
-
-    input_file_key_post = "results/01_product_apipost.csv"
-    input_file_key_put = "results/01_product_apiput.csv
-    
-    try:
-        #POSTの処理
-        # S3からデータを取得
-        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_post}")
-        df = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_post}", dtype=str)
-
-        # DynamoDBから進捗取得
-        last_post_count = get_last_processed_count("post") #レコードが取得できない場合はlast_post_count =1
-
-        # POST対象のデータ
-        post_df = df.iloc[last_post_count:]
-        if not post_df.empty:
-            logger.info(f"POST処理データ: {len(post_df)} 件")
-            process_post_data(post_df)
-            update_request_count("post", last_post_count + len(post_df))  #レコードが無い場合は追加、有る場合は更新
-
-        return {"statusCode": 200, "body": "POST処理が完了しました"}
-
-
-        #PUTの処理
-        # S3からデータを取得
-        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_put}")
-        df = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_put}", dtype=str)
-
-        # DynamoDBから進捗取得
-        last_put_count = get_last_processed_count("put") #レコードが取得できない場合はlast_post_count =1
-
-        # POST対象のデータ
-        put_df = df.iloc[last_post_count:]
-        if not post_df.empty:
-            logger.info(f"PUT処理データ: {len(post_df)} 件")
-            process_put_data(put_df)
-            update_request_count("put", last_post_count + len(post_df))  #レコードが無い場合は追加、有る場合は更新
-
-        return {"statusCode": 200, "body": "PUT処理が完了しました"}
-
-
-
-
-    except Exception as e:
-        logger.error(f"エラーが発生しました: {e}")
-        return {"statusCode": 500, "body": f"エラー: {e}"}
+print(f"文件已生成: {output_file}")
