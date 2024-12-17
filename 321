@@ -16,11 +16,11 @@ dynamodb = boto3.resource('dynamodb')
 table_name = "RequestCount"
 request_count_table = dynamodb.Table(table_name)
 
-# --- API設定 ---
-API_BASE_URL = "https://api.plapi-product.com/plapi/api/v1/products"
-HEADERS = {
+# APIトークンとヘッダの設定
+token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
+headers = {
     "User-Agent": "test-agent",
-    "Authorization": "Bearer <新しいAPIトークン>",  # トークンはここに設定
+    "Authorization": token,
     "ClientId": "75"
 }
 
@@ -100,32 +100,48 @@ def process_put_data(put_df):
 # --- Lambdaハンドラー ---
 def lambda_handler(event, context):
     bucket_name = "mastergpoc"
-    input_file_key = "results/01_product_apipost.csv"
 
+    input_file_key_post = "results/01_product_apipost.csv"
+    input_file_key_put = "results/01_product_apiput.csv
+    
     try:
+        #POSTの処理
         # S3からデータを取得
-        logger.info(f"S3読み込み: {bucket_name}/{input_file_key}")
-        df = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key}", dtype=str)
+        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_post}")
+        df = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_post}", dtype=str)
 
         # DynamoDBから進捗取得
-        last_post_count = get_last_processed_count("post")
-        last_put_count = get_last_processed_count("put")
+        last_post_count = get_last_processed_count("post") #レコードが取得できない場合はlast_post_count =1
 
         # POST対象のデータ
-        post_df = df[(df["method_type"] == "post")].iloc[last_post_count:]
+        post_df = df.iloc[last_post_count:]
         if not post_df.empty:
             logger.info(f"POST処理データ: {len(post_df)} 件")
             process_post_data(post_df)
-            update_request_count("post", last_post_count + len(post_df))
+            update_request_count("post", last_post_count + len(post_df))  #レコードが無い場合は追加、有る場合は更新
 
-        # PUT対象のデータ
-        put_df = df[(df["method_type"] == "getProductId")].iloc[last_put_count:]
-        if not put_df.empty:
-            logger.info(f"PUT処理データ: {len(put_df)} 件")
+        return {"statusCode": 200, "body": "POST処理が完了しました"}
+
+
+        #PUTの処理
+        # S3からデータを取得
+        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_put}")
+        df = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_put}", dtype=str)
+
+        # DynamoDBから進捗取得
+        last_put_count = get_last_processed_count("put") #レコードが取得できない場合はlast_post_count =1
+
+        # POST対象のデータ
+        put_df = df.iloc[last_post_count:]
+        if not post_df.empty:
+            logger.info(f"PUT処理データ: {len(post_df)} 件")
             process_put_data(put_df)
-            update_request_count("put", last_put_count + len(put_df))
+            update_request_count("put", last_post_count + len(post_df))  #レコードが無い場合は追加、有る場合は更新
 
-        return {"statusCode": 200, "body": "処理が完了しました"}
+        return {"statusCode": 200, "body": "PUT処理が完了しました"}
+
+
+
 
     except Exception as e:
         logger.error(f"エラーが発生しました: {e}")
