@@ -16,8 +16,8 @@ dynamodb = boto3.resource('dynamodb')
 table_name = "RequestCount"
 request_count_table = dynamodb.Table(table_name)
 
-# APIトークンとヘッダの設定
-token = "Bearer <YOUR_API_TOKEN>"
+# --- API設定 ---
+token = "Bearer <YOUR_API_TOKEN>"  # API トークンを設定
 headers = {
     "User-Agent": "test-agent",
     "Authorization": token,
@@ -25,9 +25,11 @@ headers = {
 }
 
 BATCH_SIZE = 100  # APIリクエストのバッチサイズ
+API_URL = "https://api.plapi-product.com/plapi/api/v1/products"
 
 # --- DynamoDB操作 ---
 def get_last_processed_count(method_type):
+    """DynamoDBから処理済み件数を取得"""
     try:
         response = request_count_table.get_item(Key={"FunctionType": method_type})
         return int(response['Item']['RecCount']) if 'Item' in response else 0
@@ -36,6 +38,7 @@ def get_last_processed_count(method_type):
         return 0
 
 def update_request_count(method_type, count):
+    """DynamoDBに処理件数を更新"""
     try:
         request_count_table.update_item(
             Key={"FunctionType": method_type},
@@ -47,6 +50,7 @@ def update_request_count(method_type, count):
 
 # --- POSTデータを処理 ---
 def process_post_data(post_df):
+    """POSTリクエストを処理"""
     for i in range(0, len(post_df), BATCH_SIZE):
         batch_df = post_df.iloc[i:i + BATCH_SIZE]
         payload = {
@@ -60,7 +64,7 @@ def process_post_data(post_df):
             ]
         }
         try:
-            response = requests.post("https://api.plapi-product.com/plapi/api/v1/products", headers=headers, json=payload)
+            response = requests.post(API_URL, headers=headers, json=payload)
             logger.info(f"POST結果: {response.status_code}, 内容: {response.json()}")
         except Exception as e:
             logger.error(f"POSTエラー: {e}")
@@ -68,6 +72,7 @@ def process_post_data(post_df):
 
 # --- PUTデータを処理 ---
 def process_put_data(put_df):
+    """PUTリクエストを処理"""
     for i in range(0, len(put_df), BATCH_SIZE):
         batch_df = put_df.iloc[i:i + BATCH_SIZE]
         payload = {
@@ -82,7 +87,7 @@ def process_put_data(put_df):
             ]
         }
         try:
-            response = requests.put("https://api.plapi-product.com/plapi/api/v1/products", headers=headers, json=payload)
+            response = requests.put(API_URL, headers=headers, json=payload)
             logger.info(f"PUT結果: {response.status_code}, 内容: {response.json()}")
         except Exception as e:
             logger.error(f"PUTエラー: {e}")
@@ -95,7 +100,7 @@ def lambda_handler(event, context):
     input_file_key_put = "results/01_product_apiput.csv"
 
     try:
-        # POSTの処理
+        # --- POST処理 ---
         logger.info(f"S3読み込み: {bucket_name}/{input_file_key_post}")
         df_post = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_post}", dtype=str)
 
@@ -106,7 +111,7 @@ def lambda_handler(event, context):
             process_post_data(post_df)
             update_request_count("post", last_post_count + len(post_df))
 
-        # PUTの処理
+        # --- PUT処理 ---
         logger.info(f"S3読み込み: {bucket_name}/{input_file_key_put}")
         df_put = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_put}", dtype=str)
 
