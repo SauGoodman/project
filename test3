@@ -3,106 +3,124 @@ import logging
 import awswrangler as wr
 import requests
 import pandas as pd
+import boto3
 from botocore.exceptions import ClientError
+from time import sleep
 
-# ログ設定の初期化
+# --- ログ設定 ---
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def lambda_handler(event, context):
+# --- DynamoDB 設定 ---
+dynamodb = boto3.resource('dynamodb')
+table_name = "RequestCount"
+request_count_table = dynamodb.Table(table_name)
+
+# --- API設定 ---
+API_URL = "https://api.plapi-product.com/plapi/api/v1/products"
+TOKEN = "Bearer <YOUR_API_TOKEN>"  # API トークンを設定
+HEADERS = {
+    "User-Agent": "test-agent",
+    "Authorization": TOKEN,
+    "ClientId": "75"
+}
+
+BATCH_SIZE = 100  # バッチサイズ
+
+# --- DynamoDB 操作 ---
+def get_last_processed_count(method_type):
+    """DynamoDBから処理済み件数を取得"""
     try:
-        # ステップ1: S3からCSVファイルを文字列型で読み込む
-        bucket_name = "mastergpoc"
-        input_file_key = "temp/01_product_compare.csv"  # 入力ファイルのS3パス
-        post_file_key = "results/01_product_apipost.csv"  # POST用結果ファイルのS3パス
-        put_file_key = "results/01_product_apiput.csv"  # PUT用結果ファイルのS3パス
+        response = request_count_table.get_item(Key={"FunctionType": method_type})
+        return int(response['Item']['RecCount']) if 'Item' in response else 0
+    except Exception as e:
+        logger.error(f"DynamoDB取得エラー: {e}")
+        return 0
 
-        logger.info(f"S3からCSVファイルを文字列型で読み込み中: s3://{bucket_name}/{input_file_key}")
+def update_request_count(method_type, count):
+    """DynamoDBに処理件数を更新"""
+    try:
+        request_count_table.update_item(
+            Key={"FunctionType": method_type},
+            UpdateExpression="SET RecCount = :count",
+            ExpressionAttributeValues={":count": count}
+        )
+    except Exception as e:
+        logger.error(f"DynamoDB更新エラー: {e}")
 
-        # CSVファイルの読み込み時にすべての列を文字列型に設定
-        try:
-            data = wr.s3.read_csv(
-                f's3://{bucket_name}/{input_file_key}',
-                dtype=str,  # 全列を文字列型で読み込む
-                keep_default_na=False  # 空白セルをNaNではなく空文字列として扱う
-            )
-        except ClientError as e:
-            logger.error(f"S3ファイルの読み込みに失敗しました: {str(e)}")
-            return {"statusCode": 500, "body": f"S3ファイルの読み込みに失敗しました: {str(e)}"}
-
-        logger.info(f"データの型確認: {data.dtypes}")
-        logger.info(f"読み込んだデータの先頭行: {data[['buturyu_cd']].head()}")
-
-        # ステップ2: APIトークンとヘッダーの設定
-        token = "Bearer your_api_token_here"  # APIトークン
-        headers = {
-            "User-Agent": "test-agent",
-            "Authorization": token,
-            "ClientId": "75"
+# --- POSTデータを処理 ---
+def process_post_data(post_df, put_file_path):
+    """POSTデータを処理し、PUT用データを保存"""
+    response_list = []
+    for i in range(0, len(post_df), BATCH_SIZE):
+        batch_df = post_df.iloc[i:i + BATCH_SIZE]
+        payload = {
+            "products": [
+                {
+                    "category_id": row.get("category_id", "default"),
+                    "product_name": row.get("product_name", "default"),
+                    "product_status": "1"
+                }
+                for _, row in batch_df.iterrows()
+            ]
         }
+        try:
+            response = requests.post(API_URL, headers=HEADERS, json=payload)
+            if response.status_code == 200:
+                logger.info(f"POST成功: {response.json()}")
+                response_list.append(response.json())
+            else:
+                logger.error(f"POST失敗: {response.status_code}, {response.text}")
+        except Exception as e:
+            logger.error(f"POSTエラー: {e}")
+        sleep(1)
+    
+    # 保存 PUT データ
+    save_post_response_to_put_file(post_df, response_list, put_file_path)
 
-        # ステップ3: APIリクエストの送信 (100レコードごと)
-        chunk_size = 100
-        post_df_list = []
-        put_df_list = []
+def save_post_response_to_put_file(post_df, response_list, put_file_path):
+    """POSTのレスポンスからProductIdを抽出し、PUTデータファイルを生成"""
+    put_data = []
+    for i, response in enumerate(response_list):
+        if response and 'products' in response:
+            for product in response['products']:
+                put_data.append({
+                    "product_id": product.get("product_id"),
+                    "category_id": post_df.iloc[i]["category_id"],
+                    "product_name": post_df.iloc[i]["product_name"],
+                    "product_status": "1"
+                })
+    # CSVとして保存
+    put_df = pd.DataFrame(put_data)
+    put_df.to_csv(put_file_path, index=False)
+    logger.info(f"PUTデータファイルが作成されました: {put_file_path}")
 
-        for i in range(0, len(data), chunk_size):
-            chunk = data.iloc[i:i + chunk_size]
-            buturyu_cd_list = chunk['buturyu_cd'].tolist()
+# --- Lambdaハンドラー ---
+def lambda_handler(event, context):
+    bucket_name = "mastergpoc"
+    input_file_key_post = "results/01_product_apipost.csv"
+    output_file_key_put = "/tmp/01_product_apiput.csv"
+    s3_output_key_put = "results/01_product_apiput.csv"
 
-            # Ensure each `buturyu_cd` is in its original string format
-            joined_buturyu_cd = "&".join([f"buturyu_cd={cd}" for cd in buturyu_cd_list])
-            api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{joined_buturyu_cd}"
+    try:
+        # --- POST処理 ---
+        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_post}")
+        df_post = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_post}", dtype=str)
 
-            logger.info(f"APIリクエスト送信中: {api_url}")
-            response = requests.get(api_url, headers=headers)
-
-            if response.status_code not in [200, 400]:
-                logger.error(f"APIリクエスト失敗: {response.status_code} - {response.text}")
-                continue
-
-            # レスポンス解析
-            try:
-                api_data = response.json()
-            except json.JSONDecodeError:
-                logger.error(f"APIレスポンスのデコードに失敗しました: {response.text}")
-                continue
-
-            errors = api_data.get("errors", [])
-            templates = api_data.get("templates", [])
-
-            # POST と PUT のデータ分割
-            error_ids = {str(error["com_product_id"]) for error in errors}
-            template_dict = {str(template["com_product_id"]): template["product_id"] for template in templates}
-
-            # POSTデータフレーム作成
-            post_df = chunk[chunk["buturyu_cd"].isin(error_ids)]
-            if not post_df.empty:
-                post_df_list.append(post_df)
-
-            # PUTデータフレーム作成
-            put_df = chunk[chunk["buturyu_cd"].isin(template_dict.keys())]
-            if not put_df.empty:
-                put_df["product_id"] = put_df["buturyu_cd"].map(template_dict)
-                put_df = put_df[["product_id"] + list(data.columns)]
-                put_df_list.append(put_df)
-
-        # 結果の結合
-        post_df = pd.concat(post_df_list, ignore_index=True) if post_df_list else pd.DataFrame()
-        put_df = pd.concat(put_df_list, ignore_index=True) if put_df_list else pd.DataFrame()
-
-        # ステップ4: S3に保存
+        # DynamoDB から進捗取得
+        last_post_count = get_last_processed_count("post")
+        post_df = df_post.iloc[last_post_count:]
         if not post_df.empty:
-            wr.s3.to_csv(post_df, f's3://{bucket_name}/{post_file_key}', index=False)
-            logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
+            logger.info(f"POST処理データ: {len(post_df)} 件")
+            process_post_data(post_df, output_file_key_put)
+            update_request_count("post", last_post_count + len(post_df))
 
-        if not put_df.empty:
-            wr.s3.to_csv(put_df, f's3://{bucket_name}/{put_file_key}', index=False)
-            logger.info(f"PUT結果を保存しました: s3://{bucket_name}/{put_file_key}")
+        # PUT用データをS3にアップロード
+        wr.s3.upload(local_file=output_file_key_put, path=f"s3://{bucket_name}/{s3_output_key_put}")
+        logger.info(f"PUTデータファイルがS3にアップロードされました: {s3_output_key_put}")
 
-        logger.info("処理が正常に完了しました。")
-        return {"statusCode": 200, "body": json.dumps("処理が正常に完了しました。")}
+        return {"statusCode": 200, "body": "POST処理が完了し、PUTデータが準備されました"}
 
     except Exception as e:
-        logger.error(f"エラーが発生しました: {str(e)}")
-        return {"statusCode": 500, "body": f"エラー: {str(e)}"}
+        logger.error(f"エラーが発生しました: {e}")
+        return {"statusCode": 500, "body": f"エラー: {e}"}
