@@ -1,6 +1,5 @@
 import boto3
 import logging
-import awswrangler as wr
 
 # --- ログ設定 ---
 logger = logging.getLogger()
@@ -35,12 +34,15 @@ def delete_s3_file(bucket, key):
 def rename_s3_file(bucket, old_key, new_key):
     """S3のファイルをリネーム（コピーして元を削除）"""
     try:
-        s3_client.copy_object(Bucket=bucket, CopySource=f"{bucket}/{old_key}", Key=new_key)
+        s3_client.copy_object(
+            Bucket=bucket, 
+            CopySource={'Bucket': bucket, 'Key': old_key}, 
+            Key=new_key
+        )
         s3_client.delete_object(Bucket=bucket, Key=old_key)
         logger.info(f"リネーム完了: s3://{bucket}/{old_key} → s3://{bucket}/{new_key}")
     except Exception as e:
         logger.error(f"ファイルリネームエラー: {e}")
-
 
 # --- DynamoDBレコード削除関数 ---
 def delete_dynamodb_records():
@@ -58,12 +60,16 @@ def backup_file():
     """バックアップ処理のメイン関数"""
     try:
         logger.info("バックアップ処理を開始します...")
-        
+
         # ファイル削除
-        delete_s3_file(BUCKET_NAME, FILE_PATHS["old_csv"])
-        delete_s3_file(BUCKET_NAME, FILE_PATHS["compare_csv"])
-        delete_s3_file(BUCKET_NAME, FILE_PATHS["apipost_csv"])
-        delete_s3_file(BUCKET_NAME, FILE_PATHS["apiput_csv"])
+        files_to_delete = [
+            FILE_PATHS["old_csv"], 
+            FILE_PATHS["compare_csv"], 
+            FILE_PATHS["apipost_csv"], 
+            FILE_PATHS["apiput_csv"]
+        ]
+        for file_key in files_to_delete:
+            delete_s3_file(BUCKET_NAME, file_key)
 
         # ファイルリネーム
         rename_s3_file(BUCKET_NAME, FILE_PATHS["new_csv"], FILE_PATHS["old_csv"])
@@ -71,14 +77,17 @@ def backup_file():
         # DynamoDBレコード削除
         delete_dynamodb_records()
 
-    
-def lambda_handler(event,context):
-
-    return{"statusCode":200,"body":"Lambda succeed"}
-
         logger.info("バックアップ処理が正常に完了しました。")
     except Exception as e:
         logger.error(f"バックアップ処理中にエラーが発生しました: {e}")
+
+# --- Lambda ハンドラー ---
+def lambda_handler(event, context):
+    backup_file()
+    return {
+        "statusCode": 200,
+        "body": "Lambda succeed"
+    }
 
 # --- ローカル実行 ---
 if __name__ == "__main__":
