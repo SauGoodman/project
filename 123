@@ -5,140 +5,124 @@ import requests
 import pandas as pd
 import boto3
 from botocore.exceptions import ClientError
+from time import sleep
 
-# ログ設定
+# --- ログ設定 ---
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# DynamoDB 設定
+# --- DynamoDB 設定 ---
 dynamodb = boto3.resource('dynamodb')
-table_name = "RequestCount"  # DynamoDBのテーブル名
+table_name = "RequestCount"
 request_count_table = dynamodb.Table(table_name)
 
-# APIトークンとヘッダの設定
-token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
+# --- API設定 ---
+token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo>"  # API トークンを設定
 headers = {
     "User-Agent": "test-agent",
     "Authorization": token,
     "ClientId": "75"
 }
 
-# データをクリーニングする関数
-def sanitize_value(value, default="default_value"):
-    """値をクリーニングし、欠損値をデフォルト値に置き換える"""
-    if pd.isna(value) or value == "":
-        return default
-    return str(value)
+BATCH_SIZE = 100  # APIリクエストのバッチサイズ
+API_URL = "https://api.plapi-product.com/plapi/api/v1/products"
 
-# DynamoDBから前回の処理件数を取得する関数
+# --- DynamoDB操作 ---
 def get_last_processed_count(method_type):
-    """DynamoDBから最後の処理件数を取得する"""
+    """DynamoDBから処理済み件数を取得"""
     try:
-        logger.info(f"DynamoDBから件数取得: method_type={method_type}")
-        response = request_count_table.get_item(Key={'FunctionType': method_type})
-        logger.info(f"DynamoDB Response: {response}")
+        response = request_count_table.get_item(Key={"FunctionType": method_type})
         return int(response['Item']['RecCount']) if 'Item' in response else 0
     except Exception as e:
         logger.error(f"DynamoDB取得エラー: {e}")
         return 0
 
-# DynamoDBに件数を更新する関数
 def update_request_count(method_type, count):
-    """DynamoDBにリクエスト件数を記録または更新する"""
+    """DynamoDBに処理件数を更新"""
     try:
-        logger.info(f"DynamoDBに件数更新: method_type={method_type}, RecCount={count}")
-        response = request_count_table.update_item(
-            Key={'FunctionType': method_type},
+        request_count_table.update_item(
+            Key={"FunctionType": method_type},
             UpdateExpression="SET RecCount = :count",
-            ExpressionAttributeValues={':count': count},
-            ReturnValues="UPDATED_NEW"
+            ExpressionAttributeValues={":count": count}
         )
-        logger.info(f"DynamoDB 更新 Response: {response}")
-    except ClientError as e:
+    except Exception as e:
         logger.error(f"DynamoDB更新エラー: {e}")
 
-# POSTデータを処理する関数
+# --- POSTデータを処理 ---
 def process_post_data(post_df):
-    """POSTデータを処理してAPIを呼び出す"""
-    post_api_url = "https://api.plapi-product.com/plapi/api/v1/products"
-    batch_size = 100
-    total_records = len(post_df)
-    
-    for i in range(0, total_records, batch_size):
-        batch_df = post_df.iloc[i:i+batch_size]
-        product_data = [{"category_id": sanitize_value(row.get("category_id")),
-                         "product_name": sanitize_value(row.get("product_name")),
-                         "product_status": "1",
-                         "edit_status": "1",
-                         "view_auth_group": "j3d7j_base",
-                         "edit_auth_group": "j3d7j_base"} for _, row in batch_df.iterrows()]
+    """POSTリクエストを処理"""
+    for i in range(0, len(post_df), BATCH_SIZE):
+        batch_df = post_df.iloc[i:i + BATCH_SIZE]
+        payload = {
+            "products": [
+                {
+                    "category_id": row.get("category_id", "default"),
+                    "product_name": row.get("product_name", "default"),
+                    "product_status": "1"
+                }
+                for _, row in batch_df.iterrows()
+            ]
+        }
+        try:
+            response = requests.post(API_URL, headers=headers, json=payload)
+            logger.info(f"POST結果: {response.status_code}, 内容: {response.json()}")
+        except Exception as e:
+            logger.error(f"POSTエラー: {e}")
+        sleep(1)
 
-        payload = {"products": product_data}
-        logger.info(f"POSTペイロード: {json.dumps(payload, ensure_ascii=False)}")
-        response = requests.post(post_api_url, headers=headers, json=payload)
-
-        if response.status_code == 200:
-            logger.info(f"POST成功: {response.json()}")
-        else:
-            logger.error(f"POST失敗: {response.status_code} - {response.text}")
-
-# PUTデータを処理する関数
+# --- PUTデータを処理 ---
 def process_put_data(put_df):
-    """PUTデータを処理してAPIを呼び出す"""
-    put_api_url = "https://api.plapi-product.com/plapi/api/v1/products"
-    batch_size = 100
-    total_records = len(put_df)
+    """PUTリクエストを処理"""
+    for i in range(0, len(put_df), BATCH_SIZE):
+        batch_df = put_df.iloc[i:i + BATCH_SIZE]
+        payload = {
+            "products": [
+                {
+                    "product_id": row.get("product_id"),
+                    "category_id": row.get("category_id", "default"),
+                    "product_name": row.get("product_name", "default"),
+                    "product_status": "1"
+                }
+                for _, row in batch_df.iterrows()
+            ]
+        }
+        try:
+            response = requests.put(API_URL, headers=headers, json=payload)
+            logger.info(f"PUT結果: {response.status_code}, 内容: {response.json()}")
+        except Exception as e:
+            logger.error(f"PUTエラー: {e}")
+        sleep(1)
 
-    for i in range(0, total_records, batch_size):
-        batch_df = put_df.iloc[i:i+batch_size]
-        product_data = [{"product_id": sanitize_value(row.get("product_id")),
-                         "category_id": sanitize_value(row.get("category_id")),
-                         "product_name": sanitize_value(row.get("product_name")),
-                         "product_status": "1",
-                         "edit_status": "1",
-                         "view_auth_group": "j3d7j_base",
-                         "edit_auth_group": "j3d7j_base"} for _, row in batch_df.iterrows()]
-
-        payload = {"products": product_data}
-        logger.info(f"PUTペイロード: {json.dumps(payload, ensure_ascii=False)}")
-        response = requests.put(put_api_url, headers=headers, json=payload)
-
-        if response.status_code == 200:
-            logger.info(f"PUT成功: {response.json()}")
-        else:
-            logger.error(f"PUT失敗: {response.status_code} - {response.text}")
-
-# Lambdaハンドラー関数
+# --- Lambdaハンドラー ---
 def lambda_handler(event, context):
+    bucket_name = "mastergpoc"
+    input_file_key_post = "results/01_product_apipost.csv"
+    input_file_key_put = "results/01_product_apiput.csv"
+
     try:
-        bucket_name = "mastergpoc"
-        input_file_key = "results/01_product_apipost.csv"
+        # --- POST処理 ---
+        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_post}")
+        df_post = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_post}", dtype=str)
 
-        logger.info(f"S3ファイル読み込み: s3://{bucket_name}/{input_file_key}")
-        df = wr.s3.read_csv(f's3://{bucket_name}/{input_file_key}', dtype=str, keep_default_na=False)
-        logger.info(f"読み込んだCSVの列: {df.columns}")
-
-        # DynamoDBから前回の件数を取得
         last_post_count = get_last_processed_count("post")
-        last_put_count = get_last_processed_count("getProductId")
-
-        # method_type でデータをフィルタリング
-        post_df = df[df["method_type"] == "post"].iloc[last_post_count:]
-        put_df = df[df["method_type"] == "getProductId"].iloc[last_put_count:]
-
-        logger.info(f"POSTデータ: {len(post_df)} 件, PUTデータ: {len(put_df)} 件")
-
-        # POSTデータを処理
+        post_df = df_post.iloc[last_post_count:]
         if not post_df.empty:
+            logger.info(f"POST処理データ: {len(post_df)} 件")
             process_post_data(post_df)
             update_request_count("post", last_post_count + len(post_df))
 
-        # PUTデータを処理
-        if not put_df.empty:
-            process_put_data(put_df)
-            update_request_count("getProductId", last_put_count + len(put_df))
+        # --- PUT処理 ---
+        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_put}")
+        df_put = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_put}", dtype=str)
 
-        return {"statusCode": 200, "body": "処理が正常に完了しました"}
+        last_put_count = get_last_processed_count("put")
+        put_df = df_put.iloc[last_put_count:]
+        if not put_df.empty:
+            logger.info(f"PUT処理データ: {len(put_df)} 件")
+            process_put_data(put_df)
+            update_request_count("put", last_put_count + len(put_df))
+
+        return {"statusCode": 200, "body": "POSTとPUT処理が完了しました"}
 
     except Exception as e:
         logger.error(f"エラーが発生しました: {e}")
