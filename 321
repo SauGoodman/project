@@ -1,19 +1,68 @@
-import pandas as pd
+import awswrangler as wr
+import boto3
+import logging
+import os
 
-# 数据结构
-data = {
-    "buturyu_c": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10011],
-    "seisiki": ["該当製品" for _ in range(11)],
-    "seihinki": ["廠陳物品" for _ in range(11)],
-    "rkkibou": ["cc維" for _ in range(11)],
-    "kouri_pr": [10001, 10002, 10003, 10004, 10005, 10006, 10007, 10008, 10009, 10010, 10011],
-}
+# --- ログ設定 ---
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
-# 创建 DataFrame
-df = pd.DataFrame(data)
+# --- S3、DynamoDB クライアントの設定 ---
+s3_client = boto3.client('s3')  # S3クライアント
+dynamodb = boto3.resource('dynamodb')  # DynamoDBリソース
+table_name = "RequestCount"  # DynamoDBテーブル名
+request_count_table = dynamodb.Table(table_name)  # DynamoDBテーブルを操作するインスタンス
 
-# 保存为 CSV 文件
-output_file = "01_product_apiput.csv"
-df.to_csv(output_file, index=False, encoding="utf-8-sig")  # 保存为 UTF-8 编码的 CSV 文件
+# --- 変数設定（S3のファイルパス） ---
+BUCKET_NAME = "mastergpoc"
+INPUT_OLD = "input/01_product_old.csv"            # 既存の古いファイル
+INPUT_NEW = "input/01_product_new.csv"            # 新規ファイル
+TEMP_COMPARE = "temp/01_product_compare.csv"      # 一時比較ファイル
+RESULT_POST = "result/01_product_apipost.csv"     # POST処理結果ファイル
+RESULT_PUT = "result/01_product_apiput.csv"       # PUT処理結果ファイル
 
-print(f"文件已生成: {output_file}")
+# --- backupFile 関数 ---
+def backup_file():
+    try:
+        # 1. input/01_product_old.csv を削除する
+        logger.info(f"Deleting file: {INPUT_OLD}")
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=INPUT_OLD)
+
+        # 2. input/01_product_new.csv を input/01_product_old.csv にリネームする
+        logger.info(f"Renaming file: {INPUT_NEW} -> {INPUT_OLD}")
+        s3_client.copy_object(Bucket=BUCKET_NAME, CopySource=f"{BUCKET_NAME}/{INPUT_NEW}", Key=INPUT_OLD)
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=INPUT_NEW)  # コピー後、新規ファイルを削除
+
+        # 3. temp/01_product_compare.csv を削除する
+        logger.info(f"Deleting file: {TEMP_COMPARE}")
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=TEMP_COMPARE)
+
+        # 4. result/01_product_apipost.csv と result/01_product_apiput.csv を削除する
+        logger.info(f"Deleting file: {RESULT_POST}")
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=RESULT_POST)
+
+        logger.info(f"Deleting file: {RESULT_PUT}")
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=RESULT_PUT)
+
+        # 5. DynamoDB テーブルのレコードをすべて削除する
+        logger.info("Deleting all records from DynamoDB table")
+        scan = request_count_table.scan()  # DynamoDBテーブル内のすべてのデータをスキャン
+        with request_count_table.batch_writer() as batch:  # バッチ操作で削除
+            for item in scan['Items']:
+                batch.delete_item(Key={"FunctionType": item['FunctionType']})  # FunctionTypeをキーとして削除
+
+        logger.info("Backup file process completed successfully")
+        return {"statusCode": 200, "body": "Backup file process completed successfully"}
+
+    except Exception as e:
+        # エラーが発生した場合の処理
+        logger.error(f"Error during backup file process: {str(e)}")
+        return {"statusCode": 500, "body": f"Error: {str(e)}"}
+
+# --- Lambda ハンドラー ---
+def lambda_handler(event, context):
+    """
+    AWS Lambda ハンドラー関数
+    イベント発火時に backup_file 関数を実行する
+    """
+    return backup_file()
