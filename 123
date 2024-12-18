@@ -41,6 +41,7 @@ def rename_s3_file(bucket, old_key, new_key):
     except Exception as e:
         logger.error(f"ファイルリネームエラー: {e}")
 
+
 # --- DynamoDBレコード削除関数 ---
 def delete_dynamodb_records():
     """DynamoDBテーブルのレコードを削除する"""
@@ -69,6 +70,11 @@ def backup_file():
 
         # DynamoDBレコード削除
         delete_dynamodb_records()
+
+    
+def lambda_handler(event,context):
+
+    return{"statusCode":200,"body":"Lambda succeed"}
 
         logger.info("バックアップ処理が正常に完了しました。")
     except Exception as e:
