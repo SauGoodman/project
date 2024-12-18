@@ -1,53 +1,3 @@
-import json
-import logging
-import awswrangler as wr
-import requests
-import pandas as pd
-import boto3
-from botocore.exceptions import ClientError
-from time import sleep
-
-# --- ログ設定 ---
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-# --- DynamoDB 設定 ---
-dynamodb = boto3.resource('dynamodb')
-table_name = "RequestCount"
-request_count_table = dynamodb.Table(table_name)
-
-# --- API設定 ---
-token = "Bearer <YOUR_API_TOKEN>"  # API トークンを設定
-headers = {
-    "User-Agent": "test-agent",
-    "Authorization": token,
-    "ClientId": "75"
-}
-
-BATCH_SIZE = 100  # APIリクエストのバッチサイズ
-API_URL = "https://api.plapi-product.com/plapi/api/v1/products"
-
-# --- DynamoDB操作 ---
-def get_last_processed_count(method_type):
-    """DynamoDBから処理済み件数を取得"""
-    try:
-        response = request_count_table.get_item(Key={"FunctionType": method_type})
-        return int(response['Item']['RecCount']) if 'Item' in response else 0
-    except Exception as e:
-        logger.error(f"DynamoDB取得エラー: {e}")
-        return 0
-
-def update_request_count(method_type, count):
-    """DynamoDBに処理件数を更新"""
-    try:
-        request_count_table.update_item(
-            Key={"FunctionType": method_type},
-            UpdateExpression="SET RecCount = :count",
-            ExpressionAttributeValues={":count": count}
-        )
-    except Exception as e:
-        logger.error(f"DynamoDB更新エラー: {e}")
-
 # --- POSTデータを処理 ---
 def process_post_data(post_df):
     """POSTリクエストを処理"""
@@ -56,9 +6,22 @@ def process_post_data(post_df):
         payload = {
             "products": [
                 {
-                    "category_id": row.get("category_id", "default"),
-                    "product_name": row.get("product_name", "default"),
-                    "product_status": "1"
+                    "category_id": row.get("category_id", "j3d7jC000021623"),
+                    "com_product_id": row.get("buturyu_cd", ""),
+                    "product_name": row.get("seihin_rkj", ""),
+                    "product_text": "",
+                    "product_status": "1",
+                    "edit_status": "1",
+                    "client_read_auth": "",
+                    "client_write_auth": "",
+                    "view_auth_group": "j3d7j_base",
+                    "edit_auth_group": "j3d7j_base",
+                    "basic": [
+                        {"id": "j3d7jE0000289845", "key": "正式商品名", "value": row.get("seisiki_syohin_nm", "")},
+                        {"id": "j3d7jE0000289846", "key": "正式商品名備考", "value": row.get("seisiki_syohin_obn", "")},
+                        {"id": "j3d7jE0000289847", "key": "製品名称", "value": row.get("seihin_kj", "")},
+                        {"id": "j3d7jE0000289853", "key": "希望小売価格", "value": row.get("kibou_kouri_pr", "")}
+                    ]
                 }
                 for _, row in batch_df.iterrows()
             ]
@@ -69,61 +32,3 @@ def process_post_data(post_df):
         except Exception as e:
             logger.error(f"POSTエラー: {e}")
         sleep(1)
-
-# --- PUTデータを処理 ---
-def process_put_data(put_df):
-    """PUTリクエストを処理"""
-    for i in range(0, len(put_df), BATCH_SIZE):
-        batch_df = put_df.iloc[i:i + BATCH_SIZE]
-        payload = {
-            "products": [
-                {
-                    "product_id": row.get("product_id"),
-                    "category_id": row.get("category_id", "default"),
-                    "product_name": row.get("product_name", "default"),
-                    "product_status": "1"
-                }
-                for _, row in batch_df.iterrows()
-            ]
-        }
-        try:
-            response = requests.put(API_URL, headers=headers, json=payload)
-            logger.info(f"PUT結果: {response.status_code}, 内容: {response.json()}")
-        except Exception as e:
-            logger.error(f"PUTエラー: {e}")
-        sleep(1)
-
-# --- Lambdaハンドラー ---
-def lambda_handler(event, context):
-    bucket_name = "mastergpoc"
-    input_file_key_post = "results/01_product_apipost.csv"
-    input_file_key_put = "results/01_product_apiput.csv"
-
-    try:
-        # --- POST処理 ---
-        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_post}")
-        df_post = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_post}", dtype=str)
-
-        last_post_count = get_last_processed_count("post")
-        post_df = df_post.iloc[last_post_count:]
-        if not post_df.empty:
-            logger.info(f"POST処理データ: {len(post_df)} 件")
-            process_post_data(post_df)
-            update_request_count("post", last_post_count + len(post_df))
-
-        # --- PUT処理 ---
-        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_put}")
-        df_put = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_put}", dtype=str)
-
-        last_put_count = get_last_processed_count("put")
-        put_df = df_put.iloc[last_put_count:]
-        if not put_df.empty:
-            logger.info(f"PUT処理データ: {len(put_df)} 件")
-            process_put_data(put_df)
-            update_request_count("put", last_put_count + len(put_df))
-
-        return {"statusCode": 200, "body": "POSTとPUT処理が完了しました"}
-
-    except Exception as e:
-        logger.error(f"エラーが発生しました: {e}")
-        return {"statusCode": 500, "body": f"エラー: {e}"}
