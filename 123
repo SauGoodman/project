@@ -1,17 +1,20 @@
 import boto3
 import logging
+import requests
+import pandas as pd
+from botocore.exceptions import ClientError
 
 # --- ログ設定 ---
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# --- S3とDynamoDB設定 ---
+# --- S3 と DynamoDB 設定 ---
 s3_client = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
 table_name = "RequestCount"
 request_count_table = dynamodb.Table(table_name)
 
-# S3バケット設定
+# S3 バケット設定
 BUCKET_NAME = "mastergpoc"
 FILE_PATHS = {
     "old_csv": "input/01_product_old.csv",
@@ -21,18 +24,26 @@ FILE_PATHS = {
     "apiput_csv": "result/01_product_apiput.csv"
 }
 
-# --- ファイル削除関数 ---
+# API 設定
+TOKEN = "Bearer eyJ0eXAioiJKV1QiL..."  # 替换为有效的Token
+HEADERS = {
+    "User-Agent": "test-agent",
+    "Authorization": TOKEN,
+    "ClientId": "75"
+}
+API_URL = "https://api.plapi-product.com/plapi/api/v1/products"
+BATCH_SIZE = 100
+
+# --- S3 ファイル削除 ---
 def delete_s3_file(bucket, key):
-    """S3からファイルを削除する"""
     try:
         s3_client.delete_object(Bucket=bucket, Key=key)
         logger.info(f"削除完了: s3://{bucket}/{key}")
     except Exception as e:
-        logger.error(f"ファイル削除エラー: s3://{bucket}/{key} - {e}")
+        logger.error(f"ファイル削除エラー: {e}")
 
-# --- ファイルリネーム関数 ---
+# --- S3 ファイルリネーム ---
 def rename_s3_file(bucket, old_key, new_key):
-    """S3のファイルをリネーム（コピーして元を削除）"""
     try:
         s3_client.copy_object(
             Bucket=bucket, 
@@ -40,28 +51,41 @@ def rename_s3_file(bucket, old_key, new_key):
             Key=new_key
         )
         s3_client.delete_object(Bucket=bucket, Key=old_key)
-        logger.info(f"リネーム完了: s3://{bucket}/{old_key} → s3://{bucket}/{new_key}")
+        logger.info(f"リネーム完了: {old_key} → {new_key}")
     except Exception as e:
         logger.error(f"ファイルリネームエラー: {e}")
 
-# --- DynamoDBレコード削除関数 ---
+# --- DynamoDB レコード削除 ---
 def delete_dynamodb_records():
-    """DynamoDBテーブルのレコードを削除する"""
     try:
         response = request_count_table.scan()
         for item in response.get('Items', []):
             request_count_table.delete_item(Key={"FunctionType": item["FunctionType"]})
-            logger.info(f"DynamoDBレコード削除: {item['FunctionType']}")
+            logger.info(f"DynamoDB レコード削除: {item['FunctionType']}")
     except Exception as e:
-        logger.error(f"DynamoDBレコード削除エラー: {e}")
+        logger.error(f"DynamoDB レコード削除エラー: {e}")
+
+# --- API データ取得 ---
+def fetch_api_data():
+    try:
+        logger.info("API からデータを取得します...")
+        response = requests.get(API_URL, headers=HEADERS)
+        if response.status_code == 200:
+            data = response.json()
+            logger.info("API データ取得完了。")
+            return pd.DataFrame(data)
+        else:
+            logger.error(f"API 取得エラー: {response.status_code} - {response.text}")
+    except Exception as e:
+        logger.error(f"API エラー: {e}")
+    return None
 
 # --- バックアップ処理 ---
 def backup_file():
-    """バックアップ処理のメイン関数"""
     try:
         logger.info("バックアップ処理を開始します...")
 
-        # ファイル削除
+        # S3 ファイル削除
         files_to_delete = [
             FILE_PATHS["old_csv"], 
             FILE_PATHS["compare_csv"], 
@@ -71,11 +95,19 @@ def backup_file():
         for file_key in files_to_delete:
             delete_s3_file(BUCKET_NAME, file_key)
 
-        # ファイルリネーム
+        # S3 ファイルリネーム
         rename_s3_file(BUCKET_NAME, FILE_PATHS["new_csv"], FILE_PATHS["old_csv"])
 
-        # DynamoDBレコード削除
+        # DynamoDB レコード削除
         delete_dynamodb_records()
+
+        # API データ取得と S3 アップロード
+        data = fetch_api_data()
+        if data is not None:
+            temp_file = "/tmp/api_data.csv"
+            data.to_csv(temp_file, index=False)
+            s3_client.upload_file(temp_file, BUCKET_NAME, FILE_PATHS["apipost_csv"])
+            logger.info(f"API データを S3 にアップロードしました: {FILE_PATHS['apipost_csv']}")
 
         logger.info("バックアップ処理が正常に完了しました。")
     except Exception as e:
