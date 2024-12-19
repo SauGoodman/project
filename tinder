@@ -377,5 +377,2252 @@ UI设计概念
 	•	魅力评分系统：基于用户活跃度与互动行为进行评分，提升用户参与度与竞争性。
 	•	价值提升：结合地理位置与个体魅力，将线上互动延伸到线下，形成真实有效的社交场景。
 
+热度地图UI设计稿概述
+
+针对中老年用户的需求，我们设计了简洁、直观的热度地图UI界面，重点突出热度区域、魅力用户标记，并易于操作。
+
+1. 热度地图UI设计结构
+
+主界面
+	1.	顶部区域
+	•	搜索栏：支持搜索地点、活动或用户。
+	•	当前位置按钮：一键返回当前所在位置。
+	2.	地图主体区域
+	•	热度展示：
+	•	使用颜色渐变表示热度（绿色→黄色→红色）。
+	•	红色区域代表人流或活动最密集的地方，绿色表示少量用户。
+	•	魅力用户标记：
+	•	魅力值高的用户用“金星图标”或“头像卡片”标记，吸引用户点击。
+	•	活动标记：
+	•	标记当前区域内正在进行的活动（例如“拼团旅游”、“社区聚会”）。
+	3.	底部信息栏
+	•	显示当前选中区域的热度信息：
+	•	参与人数、当前热门活动名称、魅力用户排行榜。
+	•	提供一键导航按钮，跳转到Google地图进行导航。
+
+界面操作流程
+	1.	用户打开地图功能 → 查看地图上的热度分布区域。
+	2.	点击红色高热度区域 → 弹出活动与用户列表。
+	3.	点击魅力用户头像 → 进入用户个人资料页。
+	4.	点击活动标记 → 查看活动详情，支持报名和评论。
+
+2. 魅力评分算法逻辑
+
+评分体系概述
+
+通过收集用户的行为数据，计算个人“魅力值”。魅力值高的用户将更容易出现在热度地图上，吸引其他用户互动。
+
+评分模型
+
+魅力值 = ￼
+
+变量	含义	权重（W）
+A	活跃度：每日登录、签到、动态发布次数。	30%
+I	互动量：收到的点赞数、评论数、私信数。	25%
+P	参与度：参与活动、拼团次数。	20%
+C	内容贡献：发布动态质量，被点赞/评论的比例。	15%
+Q	资料完整度：头像、兴趣、基本资料完整率。	10%
+
+评分规则
+	1.	数据更新周期：每天计算一次，确保实时更新。
+	2.	阈值限制：防止刷分行为，例如限制同一用户的点赞有效次数。
+	3.	权重可调节：根据实际用户行为反馈，不断优化权重分配。
+
+3. UI设计初稿展示
+
+由于图像生成需要具体视图，可描述如下：
+	•	地图主视图：
+	•	热区显示（红、黄、绿三色）。
+	•	高魅力用户的头像显示带金星图标。
+	•	热区弹窗：
+	•	显示：
+	•	活动名称、当前参与人数。
+	•	用户头像列表及魅力值排序。
+	•	按钮：
+	•	一键报名活动。
+	•	点击头像进入个人资料页。
+
+开发与实现细节
+	1.	地图功能：
+	•	使用Google Maps API加载地图、热力图和标记功能。
+	•	数据来源：用户实时位置、签到记录、参与活动行为。
+	2.	评分算法实现：
+	•	通过后台定时任务（如CRON JOB）每日更新用户魅力值。
+	•	存储：评分数据存储在用户数据库表中，按实时排序返回前端。
+	3.	性能优化：
+	•	仅加载当前可见区域的热度数据，避免地图卡顿。
+	•	使用聚合算法对高密度用户进行汇总展示。
+
+时间表调整
+
+阶段	时间周期	工作内容
+地图功能开发	第17周 - 第20周	Google Maps API集成，热力图开发。
+魅力评分系统开发	第21周 - 第23周	算法实现与前端展示开发。
+系统联调与优化	第24周 - 第25周	热力图与评分系统联调，数据优化。
+最终测试与上线	第26周	综合测试、用户反馈优化、功能上线。
+
+总结
+	1.	热度地图UI设计：以简洁直观的地图热力图为核心，吸引用户通过热点区域和魅力用户进行互动。
+	2.	评分算法逻辑：基于用户行为实时计算魅力值，增强社交吸引力。
+	3.	开发路径清晰：在原计划基础上增加地图集成与评分模块，确保功能稳定上线。
+
+新的创意方向：社交与地图互动APP功能扩展
+
+1. 魅力能量场功能 (Energy Field)
+
+概念：将用户的魅力值与地理位置结合，形成**“个人能量场”**。当用户聚集到某个地点时，会根据总魅力值生成“能量爆发点”。
+
+功能设计：
+	•	地图显示：能量场用“光环效果”或“能量波纹动画”在地图上显示。
+	•	用户互动：其他用户靠近该区域时，获得“魅力加成”或积分奖励。
+	•	事件触发：高能量场可触发**“幸运事件”**（如隐藏奖励、特殊活动）。
+
+2. 虚拟情感陪伴助手 (Virtual Companion)
+
+概念：基于用户的兴趣与互动数据，生成专属的虚拟朋友，为用户提供情感支持和活动建议。
+
+功能设计：
+	•	聊天与互动：虚拟助手会主动发起对话，推荐附近的活动、匹配好友或参与拼团。
+	•	个性定制：用户可以选择助手的个性风格（如温暖、幽默、知识型）。
+	•	奖励激励：与助手互动可提升用户的魅力值与平台活跃度。
+
+3. 缘分之门 (Destiny Portal)
+
+概念：一个地图上的“缘分之门”，用户可以通过在APP地图上标记自己的“心愿地点”，等待他人回应。
+
+功能设计：
+	•	标记心愿：用户在地图上标记一个地点，附上自己的愿望或想见的人描述。
+	•	互动方式：其他用户看到标记后，可以选择“响应心愿”，通过聊天或线下互动满足用户愿望。
+	•	惊喜奖励：完成心愿任务后，双方可获得特别的“缘分积分”或其他虚拟奖励。
+
+4. 时空留言板 (Time Capsule Board)
+
+概念：用户可以在地图上特定的地点留下“时空留言”，其他用户到该地点时可查看和回应。
+
+功能设计：
+	•	留言功能：用户可发布限时留言，如“今天我在这里等朋友，欢迎聊天”。
+	•	回忆纪念：可选择“时空胶囊”，未来特定时间自动发布。
+	•	互动方式：留言被回应后，双方可互加好友，开启更多互动。
+
+5. 集体能量挑战 (Collective Power Challenge)
+
+概念：平台定期发布**“能量挑战任务”**，用户通过集体力量完成挑战，解锁特殊奖励或真实优惠券。
+
+功能设计：
+	•	挑战示例：
+	•	在一周内累计10,000点魅力值。
+	•	某个特定区域集结200名用户共同参与社交活动。
+	•	奖励机制：任务完成后，参与用户可获得积分、虚拟礼物或真实优惠券。
+
+6. 记忆之旅 (Memory Travel)
+
+概念：用户可以记录曾去过的地点，生成个性化的“记忆地图”，平台会推荐曾经“记忆重叠”的用户，促进交流。
+
+功能设计：
+	•	自动记录功能：用户每次访问一个新地点时，系统会自动标记。
+	•	记忆重叠通知：若某用户也曾到访相同地点，系统将推送“回忆重叠”通知。
+	•	分享功能：用户可以分享“记忆地图”，生成回忆视频或电子纪念册。
+
+7. 命运之书 (Book of Fate)
+
+概念：用户每天可从**“命运之书”**中抽取一个个性化推荐，例如推荐活动、好友匹配、附近活动等，带有“命运签”的趣味设计。
+
+功能设计：
+	•	每日抽签：用户每日抽取一张命运卡片，带有幸运提示或社交建议。
+	•	签文任务：完成任务可获得“幸运积分”。
+	•	社交引导：卡片可能提示用户“今天有人在等你打招呼”或“附近有活动值得参与”。
+
+8. 光之盛典 (Festival of Light)
+
+概念：每月一次的大型虚拟与现实互动活动，平台发起**“光之盛典”**，激励用户参与户外聚会与互动。
+
+功能设计：
+	•	活动预热：提前发布活动详情，如线下聚会、主题挑战。
+	•	光环特效：参与的用户将在地图中出现特殊光环，标志其参与过活动。
+	•	最终奖励：完成任务或拥有最高魅力值的用户将获得大奖和特殊称号。
+
+技术实现与开发思路
+	•	地图功能扩展：利用Google Maps API引入“热度显示”、“位置打卡”等功能。
+	•	数据驱动：利用用户行为数据，驱动“魅力评分”、“互动推荐”等功能。
+	•	社交激励系统：通过虚拟奖励、积分、排行榜，激发用户的互动意愿。
+	•	个性化推荐引擎：使用AI模型分析用户行为，提供个性化的互动建议与推送。
+
+总结
+
+这些创意将位置互动、社交推荐与游戏化体验相结合，能够吸引用户持续使用和互动，增强平台的社交价值。
+
+马斯克式APP功能图稿与算法设计方案
+
+1. 界面设计草图（UI/UX图稿描述）
+
+1.1 主界面 - 全球社交地图（StarLink Social Map）
+
+布局描述：
+	•	顶部栏：
+	•	搜索框：地点/用户搜索。
+	•	通知中心：显示新消息、系统提醒。
+	•	地图主体区域：
+	•	实时热度显示：以光波圈层显示高互动区域，类似Google Maps的“热力图”。
+	•	价值标记：具有“高魅力值”的用户与地点显示动态星形标志。
+	•	社交聚集点：显示聚集活动、线下聚会等。
+	•	底部操作栏：
+	•	位置切换按钮。
+	•	热点分类按钮（活动、用户、魅力值排名等）。
+
+1.2 用户资料页 - 人类吸引力引擎 (Human Attraction Engine)
+
+布局描述：
+	•	头像+昵称显示（3D效果动态展示）。
+	•	吸引力指数条形图：显示社交积分排名，类似特斯拉驾驶评分。
+	•	动态成就展示：解锁的“社交勋章”与特殊荣誉。
+	•	个人行为数据总结：
+	•	活跃天数、收到的点赞与评论数、好友数量等。
+
+1.3 热点详情页 - 热力区域与用户展示
+
+布局描述：
+	•	地图区域放大，显示星状光环或闪光标记（魅力值高用户）。
+	•	区域活动卡片：当前高热度活动推荐。
+	•	点击用户头像查看详细资料与互动邀请。
+
+1.4 人际助理页 - AI 社交助理 (Social AI Companion)
+
+布局描述：
+	•	每日预测报告：
+	•	今天推荐的互动地点、潜在匹配好友列表。
+	•	今日目标任务：完成任务解锁奖励。
+
+2. 算法逻辑设计说明
+
+2.1 魅力值评分算法 (Human Attraction Scoring Algorithm)
+
+评分公式：
+
+￼
+
+变量	解释	权重 (W)
+A	活跃度 (Activity)	30%
+I	互动频率 (Interaction Rate)	25%
+E	社交参与 (Event Participation)	20%
+S	社交行为评分 (Social Score)	15%
+C	贡献程度 (Content Quality)	10%
+
+	•	动态变化：
+每天系统根据用户行为重新计算“吸引力指数”。
+	•	登录天数和互动频率记录到数据库。
+	•	用户点赞与评论的数量作为“互动频率”指标。
+	•	是否参与活动视为“社交贡献值”。
+
+2.2 地图热点生成算法 (Global Hotspot Detection)
+
+热度计算公式：
+
+￼
+
+变量	解释
+U_i	用户数量 (User Count)
+L_i	用户活动强度 (User Activity Level)
+A_j	活动数量 (Event Count)
+T_j	活动热度 (Event Popularity)
+
+	•	动态实时更新：
+系统每分钟重新计算全球热度数据，确保地图显示最新热力情况。
+
+2.3 AI 匹配引擎 (AI Matching Engine)
+
+匹配公式：
+
+￼
+
+变量	解释
+M_k	兴趣匹配度 (Matching Score)
+C_k	兴趣权重 (Interest Weight)
+L_m	地理位置匹配度 (Location Proximity)
+I_m	用户互动分数 (Interaction Score)
+
+	•	AI计算逻辑：
+	•	提取用户的兴趣标签，与其他用户标签进行“标签匹配”。
+	•	基于GPS位置计算地理位置的相似度。
+	•	根据过去的社交互动行为预测潜在的兴趣匹配用户。
+
+2.4 用户行为记录与任务引擎 (Mission Engine)
+	1.	任务触发规则：
+	•	每周发布任务（如参加社交活动或完成特定互动）。
+	•	每个任务有特定“权重值”，根据完成度获得奖励。
+	2.	排行榜计算公式：
+
+￼
+
+变量	解释
+T_n	任务类型 (Task Type)
+P_n	任务点数 (Task Points)
+
+	•	奖励机制：
+	•	积分达到一定级别后，可解锁更多活动、勋章或现实奖励。
+
+3. 开发路线图与时间表 (12个月开发周期)
+
+阶段一 (1-3个月)：产品设计与基础开发
+	•	APP功能与算法需求分析。
+	•	地图与用户数据模型设计。
+
+阶段二 (4-6个月)：功能开发与AI引擎搭建
+	•	地图与热力算法开发。
+	•	魅力评分系统与排行榜开发。
+
+阶段三 (7-9个月)：用户行为模型与AI匹配引擎优化
+	•	人际关系推荐引擎开发。
+	•	AI社交助理模型集成。
+
+阶段四 (10-12个月)：联调与全球发布
+	•	系统性能优化与测试。
+	•	全球发布与市场推广。
+
+总结：马斯克式APP的未来概念实现
+	1.	全球连接，实时互动：结合位置、数据、AI和未来社交技术。
+	2.	未来视觉设计与算法驱动：通过智能推荐与社交任务引擎驱动。
+	3.	引入区块链与数据安全：确保用户数据的隐私与透明性。
+
+马斯克式APP：详细设计扩展与开发方案
+
+4. 界面设计说明与图稿细节
+
+4.1 主界面 - 全球社交地图 (StarLink Social Map)
+
+布局描述与设计元素
+	•	地图背景层：使用Google Maps API或Mapbox。
+	•	用户显示层 (User Layer)：基于热度与魅力值分布的动态显示图层。
+	•	动态显示标志 (Dynamic Icons)：
+	•	高热度区域 → 动态“光环”显示，颜色渐变。
+	•	高魅力用户 → 显示金星标志。
+	•	活动标志 → 显示“任务旗帜”或“星球图标”。
+
+交互功能：
+	•	实时缩放 (Zoom In/Out)：支持放大和缩小，热力图自动刷新。
+	•	点击标志 (Click Marker)：显示用户资料、活动详情。
+	•	浮动菜单 (Floating Menu)：点击后弹出互动选项，如“关注”、“发消息”、“报名”等。
+
+4.2 魅力值排行榜界面 (Attraction Leaderboard)
+
+布局描述与功能说明
+	•	顶部显示区 (Header)：个人魅力值评分与全球排名。
+	•	排行榜列表 (Leaderboard List)：
+	•	按城市、国家、全球排名展示。
+	•	显示用户头像、昵称、当前魅力值。
+	•	用户点击头像，跳转到用户详情页。
+
+4.3 用户个人主页 (User Profile Page)
+
+布局设计：
+	•	主视图区 (Main View Area)：
+	•	用户头像（3D动态效果）。
+	•	昵称、魅力值评分、成就勋章。
+	•	活跃天数、互动统计数据。
+	•	动态显示区 (Dynamic Posts)：
+	•	显示用户分享的活动、互动历史、成就勋章。
+	•	支持点赞与评论。
+
+4.4 活动与任务详情页 (Event & Mission Detail Page)
+
+布局设计：
+	•	活动封面 (Event Cover)：带动态特效的活动图片。
+	•	活动详情区域 (Event Details)：
+	•	活动名称与简介。
+	•	活动规则与奖励说明。
+	•	报名/参与按钮，显示实时人数。
+	•	互动评论区 (Comment Area)：
+	•	用户评论，按时间倒序排列。
+
+5. 核心功能开发说明与算法实现细节
+
+5.1 地图热度算法 (Heat Map Algorithm)
+
+算法描述：
+	•	数据来源：用户实时位置 + 活动签到 + 魅力值评分 + 互动行为。
+	•	热力值计算公式：
+
+￼
+
+符号	含义
+H(t)	热力值 (热度分布)
+U_i	用户数量
+L_i	用户位置权重
+A_j	活动数量
+W_j	活动热度权重
+
+	•	热度显示逻辑：
+	•	绿色：冷淡区域（低热度，用户少）。
+	•	黄色：中等热度（活跃用户较多）。
+	•	红色：高热度区域（大量用户与活动集中）。
+
+5.2 AI魅力评分模型 (Attraction Scoring Model)
+
+评分公式设计：
+
+￼
+
+变量	含义	权重 (W)
+A	活跃度 (Activity)	30%
+I	互动频率 (Interaction)	25%
+E	社交事件参与 (Events)	20%
+S	社会价值贡献 (Social Score)	15%
+C	内容贡献 (Content Quality)	10%
+
+	•	实时刷新频率：每日更新一次，确保用户行为有效。
+
+5.3 AI 匹配引擎 (Matching AI Engine)
+
+匹配计算公式：
+
+￼
+
+符号	含义
+S	匹配评分
+M_k	兴趣匹配度 (Matching Score)
+C_k	兴趣权重 (Interest Weight)
+L_m	地理位置匹配度 (Location Proximity)
+I_m	用户互动评分 (Interaction Score)
+
+	•	匹配行为描述：
+	•	计算用户兴趣、地理位置与社交活跃度。
+	•	根据历史互动行为推荐潜在的社交伙伴。
+
+5.4 全球社交任务引擎 (Mission & Event Engine)
+
+任务分类：
+	1.	全球任务 (Global Missions)：全平台用户参与的大型挑战，如“全球社交聚会”任务。
+	2.	位置任务 (Location-Based Missions)：特定地点的签到与互动挑战。
+
+奖励机制：
+	•	用户通过完成任务解锁“荣誉勋章”、“虚拟礼物”与“现实奖励”。
+
+算法实现文档：未来社交平台 (Global Social Networking App)
+
+概述
+
+本算法实现文档详细描述了“未来社交平台”核心功能的算法逻辑与实现过程。包括用户位置感知、魅力评分系统、AI匹配引擎、地图热度显示，以及全球任务管理系统。
+
+1. 地图热度算法 (Heat Map Algorithm)
+
+目标
+
+动态生成全球社交地图中的“高热度区域”，显示当前用户聚集点、热点活动和实时用户交互情况。
+
+1.1 算法设计逻辑
+
+输入数据：
+	•	用户GPS位置数据 Lat, Lng
+	•	用户活跃行为数据：签到、聊天、互动频率。
+	•	活动参与数据：报名活动、参加线下活动的用户数量。
+
+热力公式：
+
+￼
+
+符号	含义
+H(t)	热力值
+U_i	用户数量
+W_{L_i}	用户位置的权重 (距离中心点的权重)
+A_j	活动参与人数
+W_{A_j}	活动热度权重
+
+1.2 算法实现步骤（伪代码）
+
+# 获取用户位置和行为数据
+def calculate_heat_map(user_data, event_data):
+    heat_map = {}
+    
+    # 遍历用户位置和活动参与记录
+    for user in user_data:
+        location = user["location"]
+        if location not in heat_map:
+            heat_map[location] = 0
+        heat_map[location] += user["activity_score"] * location_weight(location)
+    
+    for event in event_data:
+        location = event["location"]
+        if location not in heat_map:
+            heat_map[location] = 0
+        heat_map[location] += event["participants"] * event["event_weight"]
+    
+    return heat_map
+
+2. 魅力评分算法 (Attraction Scoring Algorithm)
+
+目标
+
+计算用户在平台上的“魅力值”，用于推荐、排名和社交影响力展示。
+
+2.1 算法设计逻辑
+
+输入数据：
+	•	用户登录行为 (活跃度)
+	•	用户互动行为（点赞、评论、私信）
+	•	活动参与情况（拼团、报名、签到）
+	•	内容贡献情况（动态发布、图片分享等）
+
+魅力评分公式：
+
+￼
+
+符号	含义	权重值 (W)
+M	用户魅力值	动态计算
+A	活跃度 (Activity Score)	30%
+I	互动频率 (Interaction)	25%
+E	事件参与 (Event Join)	20%
+S	社交行为评分 (Social Rank)	15%
+C	内容贡献 (Content)	10%
+
+2.2 算法实现步骤（伪代码）
+
+# 魅力评分计算函数
+def calculate_attraction_score(user):
+    activity_score = user["login_days"] * 0.3
+    interaction_score = user["likes"] * 0.25 + user["comments"] * 0.25
+    event_score = user["events_joined"] * 0.2
+    social_score = user["followers"] * 0.15
+    content_score = user["posts_shared"] * 0.1
+    
+    # 总魅力评分
+    attraction_score = (
+        activity_score +
+        interaction_score +
+        event_score +
+        social_score +
+        content_score
+    )
+    
+    return attraction_score
+
+3. AI 匹配引擎 (Matching AI Engine)
+
+目标
+
+匹配用户之间的兴趣、互动频率和地理位置，推荐潜在好友和活动。
+
+3.1 匹配评分公式
+
+￼
+
+符号	含义
+S	匹配评分
+M_k	兴趣匹配度 (Matching Score)
+C_k	兴趣权重 (Interest Weight)
+L_m	地理位置匹配度 (Location Proximity)
+I_m	用户互动分数 (Interaction Score)
+
+3.2 算法实现步骤（伪代码）
+
+# 匹配用户推荐
+def match_users(user, all_users):
+    best_matches = []
+    for other_user in all_users:
+        # 忽略自己
+        if user["id"] == other_user["id"]:
+            continue
+        
+        # 计算兴趣匹配度
+        matching_score = calculate_matching_score(user["interests"], other_user["interests"])
+        
+        # 地理位置匹配度
+        location_score = calculate_location_proximity(user["location"], other_user["location"])
+        
+        # 用户互动评分
+        interaction_score = calculate_interaction_score(user, other_user)
+        
+        # 综合评分
+        total_score = matching_score * 0.4 + location_score * 0.3 + interaction_score * 0.3
+        
+        best_matches.append((other_user["id"], total_score))
+    
+    # 按评分降序排序
+    best_matches.sort(key=lambda x: x[1], reverse=True)
+    return best_matches
+
+4. 全球任务引擎 (Mission & Event Engine)
+
+任务类型：
+	•	全球任务 (Global Missions)：如全球集体签到任务。
+	•	位置任务 (Location Missions)：特定地点的签到与互动任务。
+
+任务计算公式：
+
+￼
+
+符号	含义
+T_n	任务积分总值 (Task Points)
+W_k	任务类型权重
+P_k	用户完成任务的进度 (%)
+
+总结与扩展：未来方向
+	•	提供用户社交评分和推荐匹配系统。
+	•	精准热力地图与任务动态激励引擎。
+	•	深度学习与用户行为分析，形成更精准的全球社交平台。
+
+未来社交平台：详细实现模块设计、数据库文档与开发方案
+
+1. 系统架构设计 (System Architecture Design)
+
+1.1 系统架构概览
+
+架构模型：微服务架构 (Microservices Architecture)
+
+核心模块：
+	1.	用户管理模块 (User Management Service)
+	•	注册、登录、个人资料管理、头像上传。
+	2.	位置与地图服务模块 (Location & Mapping Service)
+	•	热度显示、位置匹配、活动位置标记。
+	3.	社交互动模块 (Social Interaction Service)
+	•	聊天、点赞、评论、好友请求。
+	4.	任务与成就模块 (Mission & Rewards Service)
+	•	任务分发与奖励机制。
+	5.	数据分析与AI推荐模块 (AI Recommendation Service)
+	•	AI推荐算法、魅力评分、好友推荐引擎。
+	6.	通知与推送模块 (Notification Service)
+	•	推送活动提醒、好友申请通知。
+	7.	管理后台模块 (Admin Dashboard Service)
+	•	管理用户、活动、任务、内容。
+
+1.2 系统架构图：
+	•	前端（React Native/Flutter）
+	•	API 网关（GraphQL/REST）
+	•	微服务层（Node.js/Express + Python）
+	•	数据库层（MongoDB + Redis + PostgreSQL）
+	•	AI 服务（推荐引擎 + TensorFlow/Scikit-learn）
+	•	地图服务（Google Maps API / Mapbox）
+	•	云端基础设施（AWS/GCP/Azure）
+
+2. 数据库设计文档 (Database Design Document)
+
+2.1 数据库结构图
+
+数据库引擎选择:
+	•	主数据库：PostgreSQL (事务处理) / MongoDB (NoSQL存储)
+	•	缓存存储：Redis (内存缓存)
+	•	数据分析仓库：BigQuery / Amazon Redshift (数据分析平台)
+
+2.2 数据库模型说明 (ER 图设计)
+
+用户表 (Users)
+
+字段名	类型	描述
+user_id	UUID	用户唯一标识符
+username	VARCHAR(50)	用户名
+email	VARCHAR(100)	邮箱
+password_hash	TEXT	加密密码
+profile_photo_url	TEXT	头像图片链接
+location_lat	FLOAT	经度
+location_lng	FLOAT	纬度
+join_date	TIMESTAMP	注册时间
+last_active	TIMESTAMP	最近活跃时间
+bio	TEXT	用户简介
+
+用户行为记录表 (User_Activities)
+
+字段名	类型	描述
+activity_id	UUID	活动记录ID
+user_id	UUID	用户ID
+activity_type	VARCHAR(50)	活动类型（登录、签到、互动）
+activity_timestamp	TIMESTAMP	活动发生时间
+location_lat	FLOAT	活动经度
+location_lng	FLOAT	活动纬度
+
+社交互动表 (Social_Interactions)
+
+字段名	类型	描述
+interaction_id	UUID	互动记录ID
+sender_id	UUID	发送者ID
+receiver_id	UUID	接收者ID
+interaction_type	VARCHAR(50)	互动类型（点赞、评论等）
+message	TEXT	消息内容（可选）
+timestamp	TIMESTAMP	互动时间
+
+任务与奖励表 (Missions_Rewards)
+
+字段名	类型	描述
+mission_id	UUID	任务ID
+mission_name	VARCHAR(100)	任务名称
+mission_description	TEXT	任务描述
+reward_points	INTEGER	奖励积分
+start_date	TIMESTAMP	任务开始时间
+end_date	TIMESTAMP	任务结束时间
+mission_status	VARCHAR(50)	任务状态（激活/完成）
+
+3. 详细开发方案 (Detailed Development Plan)
+
+3.1 技术栈选择：
+
+层次	技术栈选型
+前端	React Native / Flutter
+后端 API	Node.js + Express / GraphQL
+数据库	PostgreSQL + MongoDB + Redis
+数据分析与AI	Python (TensorFlow, Scikit-learn)
+地图服务	Google Maps API / Mapbox
+云存储与托管	AWS S3 / Firebase / Azure
+推送服务	Firebase Cloud Messaging
+
+3.2 开发周期 (12个月计划)
+
+阶段一：产品设计与需求分析 (1-2个月)
+	•	市场调研与功能需求文档制定。
+	•	数据库设计与系统架构原型。
+	•	界面原型设计 (Figma)。
+
+阶段二：后端与数据库开发 (3-6个月)
+	•	搭建用户认证与位置服务模块。
+	•	API 开发与管理系统构建。
+	•	开发数据库模型与核心API（注册/登录/任务管理/用户互动）。
+
+阶段三：前端应用开发 (5-8个月)
+	•	开发APP主界面与功能模块。
+	•	整合地图服务 (Google Maps)。
+	•	实现用户档案、个人主页与互动功能。
+
+阶段四：AI推荐与算法开发 (6-9个月)
+	•	魅力评分系统与推荐算法实现。
+	•	社交匹配引擎与数据分析服务。
+
+阶段五：测试与优化 (10-12个月)
+	•	单元测试、系统测试、负载测试。
+	•	修复与优化代码库。
+	•	全球发布与市场推广计划执行。
+
+4. 扩展功能与未来计划
+	•	区块链身份认证：确保数据安全与用户隐私。
+	•	数据可视化分析：引入深度数据挖掘和用户行为预测。
+	•	全球任务排行榜：基于活动数据生成用户全球排名和成就。
+
+算法实现文档：未来社交平台 (Global Social Networking App)
+
+概述
+
+本算法实现文档详细描述了“未来社交平台”核心功能的算法逻辑与实现过程。包括用户位置感知、魅力评分系统、AI匹配引擎、地图热度显示，以及全球任务管理系统。
+
+1. 地图热度算法 (Heat Map Algorithm)
+
+目标
+
+动态生成全球社交地图中的“高热度区域”，显示当前用户聚集点、热点活动和实时用户交互情况。
+
+1.1 算法设计逻辑
+
+输入数据：
+	•	用户GPS位置数据 Lat, Lng
+	•	用户活跃行为数据：签到、聊天、互动频率。
+	•	活动参与数据：报名活动、参加线下活动的用户数量。
+
+热力公式：
+
+￼
+
+符号	含义
+H(t)	热力值
+U_i	用户数量
+W_{L_i}	用户位置的权重 (距离中心点的权重)
+A_j	活动参与人数
+W_{A_j}	活动热度权重
+
+1.2 算法实现步骤（伪代码）
+
+# 获取用户位置和行为数据
+def calculate_heat_map(user_data, event_data):
+    heat_map = {}
+    
+    # 遍历用户位置和活动参与记录
+    for user in user_data:
+        location = user["location"]
+        if location not in heat_map:
+            heat_map[location] = 0
+        heat_map[location] += user["activity_score"] * location_weight(location)
+    
+    for event in event_data:
+        location = event["location"]
+        if location not in heat_map:
+            heat_map[location] = 0
+        heat_map[location] += event["participants"] * event["event_weight"]
+    
+    return heat_map
+
+2. 魅力评分算法 (Attraction Scoring Algorithm)
+
+目标
+
+计算用户在平台上的“魅力值”，用于推荐、排名和社交影响力展示。
+
+2.1 算法设计逻辑
+
+输入数据：
+	•	用户登录行为 (活跃度)
+	•	用户互动行为（点赞、评论、私信）
+	•	活动参与情况（拼团、报名、签到）
+	•	内容贡献情况（动态发布、图片分享等）
+
+魅力评分公式：
+
+￼
+
+符号	含义	权重值 (W)
+M	用户魅力值	动态计算
+A	活跃度 (Activity Score)	30%
+I	互动频率 (Interaction)	25%
+E	事件参与 (Event Join)	20%
+S	社交行为评分 (Social Rank)	15%
+C	内容贡献 (Content)	10%
+
+2.2 算法实现步骤（伪代码）
+
+# 魅力评分计算函数
+def calculate_attraction_score(user):
+    activity_score = user["login_days"] * 0.3
+    interaction_score = user["likes"] * 0.25 + user["comments"] * 0.25
+    event_score = user["events_joined"] * 0.2
+    social_score = user["followers"] * 0.15
+    content_score = user["posts_shared"] * 0.1
+    
+    # 总魅力评分
+    attraction_score = (
+        activity_score +
+        interaction_score +
+        event_score +
+        social_score +
+        content_score
+    )
+    
+    return attraction_score
+
+3. AI 匹配引擎 (Matching AI Engine)
+
+目标
+
+匹配用户之间的兴趣、互动频率和地理位置，推荐潜在好友和活动。
+
+3.1 匹配评分公式
+
+￼
+
+符号	含义
+S	匹配评分
+M_k	兴趣匹配度 (Matching Score)
+C_k	兴趣权重 (Interest Weight)
+L_m	地理位置匹配度 (Location Proximity)
+I_m	用户互动分数 (Interaction Score)
+
+3.2 算法实现步骤（伪代码）
+
+# 匹配用户推荐
+def match_users(user, all_users):
+    best_matches = []
+    for other_user in all_users:
+        # 忽略自己
+        if user["id"] == other_user["id"]:
+            continue
+        
+        # 计算兴趣匹配度
+        matching_score = calculate_matching_score(user["interests"], other_user["interests"])
+        
+        # 地理位置匹配度
+        location_score = calculate_location_proximity(user["location"], other_user["location"])
+        
+        # 用户互动评分
+        interaction_score = calculate_interaction_score(user, other_user)
+        
+        # 综合评分
+        total_score = matching_score * 0.4 + location_score * 0.3 + interaction_score * 0.3
+        
+        best_matches.append((other_user["id"], total_score))
+    
+    # 按评分降序排序
+    best_matches.sort(key=lambda x: x[1], reverse=True)
+    return best_matches
+
+4. 全球任务引擎 (Mission & Event Engine)
+
+任务类型：
+	•	全球任务 (Global Missions)：如全球集体签到任务。
+	•	位置任务 (Location Missions)：特定地点的签到与互动任务。
+
+任务计算公式：
+
+￼
+
+符号	含义
+T_n	任务积分总值 (Task Points)
+W_k	任务类型权重
+P_k	用户完成任务的进度 (%)
+
+总结与扩展：未来方向
+	•	提供用户社交评分和推荐匹配系统。
+	•	精准热力地图与任务动态激励引擎。
+	•	深度学习与用户行为分析，形成更精准的全球社交平台。
+
+未来社交平台：详细实现模块设计、数据库文档与开发方案
+
+1. 系统架构设计 (System Architecture Design)
+
+1.1 系统架构概览
+
+架构模型：微服务架构 (Microservices Architecture)
+
+核心模块：
+	1.	用户管理模块 (User Management Service)
+	•	注册、登录、个人资料管理、头像上传。
+	2.	位置与地图服务模块 (Location & Mapping Service)
+	•	热度显示、位置匹配、活动位置标记。
+	3.	社交互动模块 (Social Interaction Service)
+	•	聊天、点赞、评论、好友请求。
+	4.	任务与成就模块 (Mission & Rewards Service)
+	•	任务分发与奖励机制。
+	5.	数据分析与AI推荐模块 (AI Recommendation Service)
+	•	AI推荐算法、魅力评分、好友推荐引擎。
+	6.	通知与推送模块 (Notification Service)
+	•	推送活动提醒、好友申请通知。
+	7.	管理后台模块 (Admin Dashboard Service)
+	•	管理用户、活动、任务、内容。
+
+1.2 系统架构图：
+	•	前端（React Native/Flutter）
+	•	API 网关（GraphQL/REST）
+	•	微服务层（Node.js/Express + Python）
+	•	数据库层（MongoDB + Redis + PostgreSQL）
+	•	AI 服务（推荐引擎 + TensorFlow/Scikit-learn）
+	•	地图服务（Google Maps API / Mapbox）
+	•	云端基础设施（AWS/GCP/Azure）
+
+2. 数据库设计文档 (Database Design Document)
+
+2.1 数据库结构图
+
+数据库引擎选择:
+	•	主数据库：PostgreSQL (事务处理) / MongoDB (NoSQL存储)
+	•	缓存存储：Redis (内存缓存)
+	•	数据分析仓库：BigQuery / Amazon Redshift (数据分析平台)
+
+2.2 数据库模型说明 (ER 图设计)
+
+用户表 (Users)
+
+字段名	类型	描述
+user_id	UUID	用户唯一标识符
+username	VARCHAR(50)	用户名
+email	VARCHAR(100)	邮箱
+password_hash	TEXT	加密密码
+profile_photo_url	TEXT	头像图片链接
+location_lat	FLOAT	经度
+location_lng	FLOAT	纬度
+join_date	TIMESTAMP	注册时间
+last_active	TIMESTAMP	最近活跃时间
+bio	TEXT	用户简介
+
+用户行为记录表 (User_Activities)
+
+字段名	类型	描述
+activity_id	UUID	活动记录ID
+user_id	UUID	用户ID
+activity_type	VARCHAR(50)	活动类型（登录、签到、互动）
+activity_timestamp	TIMESTAMP	活动发生时间
+location_lat	FLOAT	活动经度
+location_lng	FLOAT	活动纬度
+
+社交互动表 (Social_Interactions)
+
+字段名	类型	描述
+interaction_id	UUID	互动记录ID
+sender_id	UUID	发送者ID
+receiver_id	UUID	接收者ID
+interaction_type	VARCHAR(50)	互动类型（点赞、评论等）
+message	TEXT	消息内容（可选）
+timestamp	TIMESTAMP	互动时间
+
+任务与奖励表 (Missions_Rewards)
+
+字段名	类型	描述
+mission_id	UUID	任务ID
+mission_name	VARCHAR(100)	任务名称
+mission_description	TEXT	任务描述
+reward_points	INTEGER	奖励积分
+start_date	TIMESTAMP	任务开始时间
+end_date	TIMESTAMP	任务结束时间
+mission_status	VARCHAR(50)	任务状态（激活/完成）
+
+3. 详细开发方案 (Detailed Development Plan)
+
+3.1 技术栈选择：
+
+层次	技术栈选型
+前端	React Native / Flutter
+后端 API	Node.js + Express / GraphQL
+数据库	PostgreSQL + MongoDB + Redis
+数据分析与AI	Python (TensorFlow, Scikit-learn)
+地图服务	Google Maps API / Mapbox
+云存储与托管	AWS S3 / Firebase / Azure
+推送服务	Firebase Cloud Messaging
+
+3.2 开发周期 (12个月计划)
+
+阶段一：产品设计与需求分析 (1-2个月)
+	•	市场调研与功能需求文档制定。
+	•	数据库设计与系统架构原型。
+	•	界面原型设计 (Figma)。
+
+阶段二：后端与数据库开发 (3-6个月)
+	•	搭建用户认证与位置服务模块。
+	•	API 开发与管理系统构建。
+	•	开发数据库模型与核心API（注册/登录/任务管理/用户互动）。
+
+阶段三：前端应用开发 (5-8个月)
+	•	开发APP主界面与功能模块。
+	•	整合地图服务 (Google Maps)。
+	•	实现用户档案、个人主页与互动功能。
+
+阶段四：AI推荐与算法开发 (6-9个月)
+	•	魅力评分系统与推荐算法实现。
+	•	社交匹配引擎与数据分析服务。
+
+阶段五：测试与优化 (10-12个月)
+	•	单元测试、系统测试、负载测试。
+	•	修复与优化代码库。
+	•	全球发布与市场推广计划执行。
+
+4. 扩展功能与未来计划
+	•	区块链身份认证：确保数据安全与用户隐私。
+	•	数据可视化分析：引入深度数据挖掘和用户行为预测。
+	•	全球任务排行榜：基于活动数据生成用户全球排名和成就。
+
+已生成未来社交平台的界面设计原型图，展示了用户个人资料、全球社交地图、任务模块和聊天社交动态模块。现在将继续详细说明模块设计方案与算法实现代码。
+
+模块设计方案与算法实现代码
+
+1. 系统模块结构概述
+
+模块架构图描述
+
+Frontend (React Native/Flutter)
+    |--> Global Map Interface
+    |--> Profile Management
+    |--> Chat & Social Feed
+    |--> Mission Control Center
+
+API Gateway (GraphQL / REST)
+    |--> User Service
+    |--> Location & Map Service
+    |--> Mission & Rewards Service
+    |--> AI Recommendation Service
+    |--> Notifications Service
+
+Databases:
+    |--> PostgreSQL (Relational DB)
+    |--> MongoDB (NoSQL)
+    |--> Redis (Caching & Real-time Data)
+
+2. 模块详细设计文档与伪代码
+
+2.1 用户管理模块 (User Management Service)
+
+功能说明：
+	•	用户注册、登录、资料更新与个人数据管理。
+	•	社交好友添加、好友推荐。
+
+用户注册与登录伪代码：
+
+# 注册新用户
+def register_user(username, email, password):
+    hashed_password = hash_password(password)
+    user = {
+        "user_id": generate_uuid(),
+        "username": username,
+        "email": email,
+        "password_hash": hashed_password,
+        "join_date": get_current_time(),
+    }
+    save_to_database("users", user)
+    return {"status": "success", "message": "User registered successfully"}
+
+# 登录用户
+def login_user(email, password):
+    user = find_in_database("users", {"email": email})
+    if user and verify_password(password, user["password_hash"]):
+        token = generate_jwt_token(user["user_id"])
+        return {"status": "success", "token": token}
+    else:
+        return {"status": "error", "message": "Invalid login credentials"}
+
+2.2 全球地图与位置服务模块 (Location & Mapping Service)
+
+功能说明：
+	•	地理位置服务，基于用户位置推荐“高热度”区域和活动。
+	•	使用 Google Maps API / Mapbox 实现实时地图。
+
+地理位置服务代码实现：
+
+# 获取当前用户位置
+def get_user_location(user_id):
+    user = find_in_database("users", {"user_id": user_id})
+    return {"lat": user["location_lat"], "lng": user["location_lng"]}
+
+# 更新用户位置
+def update_user_location(user_id, lat, lng):
+    update_database("users", {"user_id": user_id}, {"location_lat": lat, "location_lng": lng})
+    return {"status": "success", "message": "Location updated successfully"}
+
+地图热度计算逻辑：
+
+# 计算地图热度
+def calculate_heat_map(user_data, event_data):
+    heat_map = {}
+    for user in user_data:
+        location = (user["location_lat"], user["location_lng"])
+        if location not in heat_map:
+            heat_map[location] = 0
+        heat_map[location] += user["activity_score"] * location_weight(location)
+    
+    for event in event_data:
+        location = (event["location_lat"], event["location_lng"])
+        if location not in heat_map:
+            heat_map[location] = 0
+        heat_map[location] += event["participants"] * event["event_weight"]
+
+    return heat_map
+
+2.3 魅力评分与社交推荐引擎 (Attraction & Recommendation Service)
+
+功能说明：
+	•	根据用户行为数据（登录、点赞、活动报名等）计算“魅力评分”。
+	•	使用 AI 算法推荐好友与社交匹配。
+
+魅力评分计算代码：
+
+# 计算魅力评分
+def calculate_attraction_score(user):
+    activity_score = user["login_days"] * 0.3
+    interaction_score = user["likes"] * 0.25 + user["comments"] * 0.25
+    event_score = user["events_joined"] * 0.2
+    social_score = user["followers"] * 0.15
+    content_score = user["posts_shared"] * 0.1
+    
+    # 计算总评分
+    attraction_score = (
+        activity_score +
+        interaction_score +
+        event_score +
+        social_score +
+        content_score
+    )
+    return round(attraction_score, 2)
+
+好友推荐算法：
+
+# 好友推荐引擎
+def recommend_friends(current_user, all_users):
+    recommendations = []
+    for user in all_users:
+        if user["user_id"] == current_user["user_id"]:
+            continue
+        
+        match_score = calculate_matching_score(current_user["interests"], user["interests"])
+        location_score = calculate_location_proximity(
+            current_user["location_lat"], current_user["location_lng"],
+            user["location_lat"], user["location_lng"]
+        )
+        interaction_score = calculate_interaction_score(current_user, user)
+
+        total_score = match_score * 0.4 + location_score * 0.3 + interaction_score * 0.3
+        recommendations.append((user["user_id"], total_score))
+    
+    # 排序推荐列表
+    recommendations.sort(key=lambda x: x[1], reverse=True)
+    return recommendations
+
+3. 数据库结构设计概览 (ER 图)
+
+主要数据表结构：
+
+1. 用户表 (Users Table)
+
+字段名	数据类型	描述
+user_id	UUID	用户唯一标识
+username	VARCHAR(50)	用户名
+email	VARCHAR(100)	邮箱
+password_hash	TEXT	密码哈希值
+location_lat	FLOAT	当前经度
+location_lng	FLOAT	当前纬度
+join_date	TIMESTAMP	注册时间
+last_active	TIMESTAMP	最后活跃时间
+
+扩展模块：未来开发方向
+	•	区块链身份认证模块：确保用户数据的隐私性和透明度。
+	•	多语言支持与全球发布功能。
+	•	数据分析与用户行为可视化模块。
+
+未来社交平台：详细模块设计与代码实现文档
+
+系统架构扩展 (System Architecture Expansion)
+
+系统模块架构层次图
+
+Frontend (React Native/Flutter)
+    |--> Global Map Interface
+    |--> Profile Management
+    |--> Chat & Social Feed
+    |--> Mission Control Center
+
+API Gateway (GraphQL / REST)
+    |--> User Service
+    |--> Location & Map Service
+    |--> Mission & Rewards Service
+    |--> AI Recommendation Service
+    |--> Notifications Service
+
+Data Layer:
+    |--> PostgreSQL (Relational DB)
+    |--> MongoDB (NoSQL)
+    |--> Redis (Caching & Real-time Data)
+    |--> Cloud Storage (Amazon S3 / Firebase)
+
+AI & ML Layer:
+    |--> Data Processing (TensorFlow, Scikit-learn)
+    |--> Recommendation System
+    |--> Behavior Analysis Engine
+
+模块详细设计与代码实现
+
+模块 1: 用户管理服务 (User Management Service)
+
+1.1 功能设计说明
+	•	用户注册与登录
+	•	用户资料更新与头像上传
+	•	用户验证与授权 (JWT + OAuth2)
+	•	用户好友管理
+
+1.2 数据库设计 (PostgreSQL)
+
+CREATE TABLE Users (
+    user_id UUID PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    profile_photo_url TEXT,
+    bio TEXT,
+    join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Friends (
+    user_id UUID NOT NULL,
+    friend_id UUID NOT NULL,
+    friendship_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, friend_id)
+);
+
+1.3 用户注册与登录代码实现 (Node.js + Express.js)
+
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+
+// 注册用户
+async function registerUser(req, res) {
+    const { username, email, password } = req.body;
+
+    // 加密密码
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 保存到数据库
+    const newUser = await db.Users.create({
+        user_id: generateUUID(),
+        username,
+        email,
+        password_hash: hashedPassword,
+    });
+
+    res.status(201).json({ message: "User registered successfully" });
+}
+
+// 用户登录
+async function loginUser(req, res) {
+    const { email, password } = req.body;
+
+    const user = await db.Users.findOne({ where: { email } });
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+        return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // 生成JWT Token
+    const token = jwt.sign({ user_id: user.user_id }, process.env.JWT_SECRET, {
+        expiresIn: "7d",
+    });
+
+    res.json({ token, message: "Login successful" });
+}
+
+模块 2: 全球地图与位置服务 (Location & Mapping Service)
+
+2.1 功能设计说明
+	•	用户位置管理与更新
+	•	地图热力图计算与显示 (Google Maps API / Mapbox)
+	•	社交活动标记与推荐
+
+2.2 数据库设计 (MongoDB)
+
+const UserLocationSchema = new mongoose.Schema({
+    user_id: { type: String, required: true },
+    location_lat: { type: Number, required: true },
+    location_lng: { type: Number, required: true },
+    last_updated: { type: Date, default: Date.now },
+});
+
+const ActivitySchema = new mongoose.Schema({
+    activity_id: { type: String, required: true },
+    activity_name: { type: String, required: true },
+    location_lat: { type: Number, required: true },
+    location_lng: { type: Number, required: true },
+    participants: { type: Number, default: 0 },
+    event_weight: { type: Number, default: 1 },
+});
+
+2.3 位置管理服务代码实现 (Node.js + Express.js)
+
+// 更新用户位置
+async function updateUserLocation(req, res) {
+    const { user_id, lat, lng } = req.body;
+
+    await db.UserLocation.findOneAndUpdate(
+        { user_id },
+        { location_lat: lat, location_lng: lng, last_updated: Date.now() },
+        { upsert: true }
+    );
+
+    res.json({ message: "Location updated successfully" });
+}
+
+// 获取用户位置
+async function getUserLocation(req, res) {
+    const { user_id } = req.params;
+
+    const location = await db.UserLocation.findOne({ user_id });
+    if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+    }
+
+    res.json(location);
+}
+
+模块 3: AI 推荐与社交匹配引擎 (Recommendation & Matching Service)
+
+3.1 功能设计说明
+	•	魅力评分计算引擎 (基于用户行为)
+	•	AI 推荐好友与活动
+	•	地理位置匹配与兴趣筛选
+
+3.2 数据存储设计 (PostgreSQL + Redis 缓存)
+
+CREATE TABLE UserScores (
+    user_id UUID PRIMARY KEY,
+    attraction_score REAL DEFAULT 0,
+    last_calculated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE FriendRecommendations (
+    recommendation_id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    recommended_user_id UUID NOT NULL,
+    score REAL NOT NULL,
+    recommendation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+3.3 算法实现代码 (Python - Scikit-learn)
+
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+# 计算用户兴趣匹配分数
+def calculate_similarity(user_vector, candidate_vector):
+    score = cosine_similarity(
+        np.array(user_vector).reshape(1, -1),
+        np.array(candidate_vector).reshape(1, -1),
+    )
+    return score[0][0]
+
+# 推荐好友算法
+def recommend_friends(current_user, all_users):
+    recommendations = []
+    for user in all_users:
+        if user["user_id"] == current_user["user_id"]:
+            continue
+        
+        # 匹配兴趣与位置
+        interest_score = calculate_similarity(
+            current_user["interests"], user["interests"]
+        )
+        location_score = 1 - abs(
+            current_user["location_lat"] - user["location_lat"]
+        ) * abs(current_user["location_lng"] - user["location_lng"])
+
+        # 计算推荐分数
+        total_score = interest_score * 0.6 + location_score * 0.4
+        recommendations.append((user["user_id"], total_score))
+    
+    # 按分数排序
+    recommendations.sort(key=lambda x: x[1], reverse=True)
+    return recommendations
+
+扩展模块开发方向：
+	1.	区块链身份认证系统
+	2.	多语言支持与全球扩展
+	3.	用户行为分析与动态预测
+	4.	社交成就与任务管理服务 (Gamification Engine)
+
+未来社交平台：详细模块实现代码、数据库设计与项目架构文档
+
+1. 项目架构文档 (Project Architecture Documentation)
+
+1.1 系统架构图 (System Architecture Overview)
+
+技术栈选择 (Tech Stack Overview)
+
+层次	技术选型
+前端 (Frontend)	React Native / Flutter
+后端 (Backend)	Node.js + Express.js + GraphQL
+数据库 (Databases)	PostgreSQL + MongoDB + Redis
+AI 服务 (AI Services)	Python (TensorFlow / Scikit-learn)
+地理位置 (Mapping API)	Google Maps API / Mapbox
+推送服务 (Notification)	Firebase Cloud Messaging
+云服务 (Cloud Services)	AWS S3 / Firebase / Azure
+安全 (Security)	JWT + OAuth2 + SSL
+
+架构层次设计图 (System Layered Architecture)
+
+Frontend (React Native/Flutter)
+    |--> Map Interface
+    |--> Social Feed & Chat
+    |--> Profile Management
+    |--> Mission Control
+
+API Gateway (GraphQL / REST API)
+    |--> User Service (Auth, Profiles)
+    |--> Location & Map Service
+    |--> Social Network Service (Friends, Activities)
+    |--> AI Recommendation Service
+    |--> Mission & Rewards Service
+    |--> Notifications Service
+
+Data Layer:
+    |--> PostgreSQL (Transactional Data)
+    |--> MongoDB (Unstructured Data)
+    |--> Redis (Caching & Real-time Data)
+
+AI Layer:
+    |--> Recommendation System (Scikit-learn / TensorFlow)
+    |--> Behavior Analysis Engine
+
+2. 数据库设计 (Database Design)
+
+2.1 PostgreSQL 关系数据库设计 (Relational DB)
+
+主数据库表设计 (Core Tables)
+
+1. 用户管理表 (Users Table)
+
+CREATE TABLE Users (
+    user_id UUID PRIMARY KEY,            -- 唯一用户ID
+    username VARCHAR(50) NOT NULL,       -- 用户名
+    email VARCHAR(100) UNIQUE NOT NULL,  -- 邮箱地址
+    password_hash TEXT NOT NULL,         -- 加密密码
+    profile_photo_url TEXT,              -- 头像图片
+    bio TEXT,                            -- 用户简介
+    join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 注册时间
+    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- 最后活跃时间
+);
+
+2. 好友关系表 (Friends Table)
+
+CREATE TABLE Friends (
+    user_id UUID NOT NULL,               -- 用户ID
+    friend_id UUID NOT NULL,             -- 好友ID
+    friendship_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 成为好友的时间
+    PRIMARY KEY (user_id, friend_id)
+);
+
+3. 社交互动表 (Social Interactions Table)
+
+CREATE TABLE SocialInteractions (
+    interaction_id UUID PRIMARY KEY,     -- 互动记录ID
+    sender_id UUID NOT NULL,             -- 发送者ID
+    receiver_id UUID NOT NULL,           -- 接收者ID
+    interaction_type VARCHAR(50) NOT NULL, -- 互动类型 (点赞、评论、私信)
+    message TEXT,                        -- 消息内容 (可选)
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- 互动时间
+);
+
+4. 任务与奖励表 (Missions & Rewards Table)
+
+CREATE TABLE Missions (
+    mission_id UUID PRIMARY KEY,         -- 任务唯一ID
+    mission_name VARCHAR(100) NOT NULL, -- 任务名称
+    mission_description TEXT,            -- 任务描述
+    reward_points INTEGER DEFAULT 0,     -- 奖励积分
+    start_date TIMESTAMP,                -- 任务开始时间
+    end_date TIMESTAMP,                  -- 任务结束时间
+    mission_status VARCHAR(50) DEFAULT 'Active' -- 任务状态 (激活/完成)
+);
+
+3. 详细模块实现代码 (Detailed Module Implementation Code)
+
+模块 1: 用户管理与身份认证 (User Management & Authentication)
+
+代码实现 (Node.js + Express.js)
+
+用户注册与登录服务 (Auth Service)
+
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+
+// 注册用户
+async function registerUser(req, res) {
+    const { username, email, password } = req.body;
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = await db.Users.create({
+        user_id: generateUUID(),
+        username,
+        email,
+        password_hash: hashedPassword,
+    });
+
+    res.status(201).json({ message: "注册成功", user: newUser });
+}
+
+// 登录用户
+async function loginUser(req, res) {
+    const { email, password } = req.body;
+
+    const user = await db.Users.findOne({ where: { email } });
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+        return res.status(401).json({ message: "登录失败，凭据无效" });
+    }
+
+    const token = jwt.sign({ user_id: user.user_id }, process.env.JWT_SECRET, {
+        expiresIn: "7d",
+    });
+
+    res.json({ token, message: "登录成功" });
+}
+
+模块 2: 地图与位置服务 (Location & Map Service)
+
+代码实现 (Node.js + MongoDB)
+
+地理位置管理服务代码 (Location Service)
+
+// 更新用户位置
+async function updateUserLocation(req, res) {
+    const { user_id, lat, lng } = req.body;
+
+    await db.UserLocation.findOneAndUpdate(
+        { user_id },
+        { location_lat: lat, location_lng: lng, last_updated: Date.now() },
+        { upsert: true }
+    );
+
+    res.json({ message: "位置更新成功" });
+}
+
+// 获取用户位置
+async function getUserLocation(req, res) {
+    const { user_id } = req.params;
+
+    const location = await db.UserLocation.findOne({ user_id });
+    if (!location) {
+        return res.status(404).json({ message: "位置未找到" });
+    }
+
+    res.json(location);
+}
+
+模块 3: 推荐与社交匹配引擎 (Recommendation & Matching Engine)
+
+代码实现 (Python + Scikit-learn)
+
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+# 计算用户兴趣匹配分数
+def calculate_similarity(user_vector, candidate_vector):
+    score = cosine_similarity(
+        np.array(user_vector).reshape(1, -1),
+        np.array(candidate_vector).reshape(1, -1),
+    )
+    return score[0][0]
+
+# 推荐好友算法
+def recommend_friends(current_user, all_users):
+    recommendations = []
+    for user in all_users:
+        if user["user_id"] == current_user["user_id"]:
+            continue
+        
+        # 匹配兴趣与位置
+        interest_score = calculate_similarity(
+            current_user["interests"], user["interests"]
+        )
+        location_score = 1 - abs(
+            current_user["location_lat"] - user["location_lat"]
+        ) * abs(current_user["location_lng"] - user["location_lng"])
+
+        total_score = interest_score * 0.6 + location_score * 0.4
+        recommendations.append((user["user_id"], total_score))
+    
+    recommendations.sort(key=lambda x: x[1], reverse=True)
+    return recommendations
+
+未来社交平台：实现模块代码、数据库迁移脚本与云部署方案
+
+1. 项目结构 (Project Structure)
+
+/future-social-app
+    |-- /backend
+        |-- /api
+            |-- /services
+                |-- authService.js
+                |-- userService.js
+                |-- locationService.js
+                |-- socialService.js
+                |-- missionService.js
+            |-- /models
+                |-- User.js
+                |-- Location.js
+                |-- Interaction.js
+                |-- Mission.js
+        |-- /config
+            |-- database.js
+            |-- jwtConfig.js
+        |-- index.js (API Server Entry)
+    |-- /frontend
+        |-- /src
+            |-- /components
+            |-- /pages
+            |-- App.js
+            |-- index.js
+    |-- /database
+        |-- migrations
+            |-- init.sql
+            |-- create_users_table.sql
+            |-- create_friends_table.sql
+            |-- create_social_interactions.sql
+            |-- create_missions.sql
+    |-- docker-compose.yml
+    |-- Dockerfile
+    |-- package.json
+    |-- README.md
+
+2. 实现模块代码 (Detailed Implementation Code)
+
+2.1 用户管理模块 (User Management Module)
+
+/services/authService.js
+
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const db = require("../config/database");
+
+// 注册新用户
+exports.registerUser = async (req, res) => {
+  const { username, email, password } = req.body;
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  try {
+    const newUser = await db.Users.create({
+      user_id: generateUUID(),
+      username,
+      email,
+      password_hash: hashedPassword,
+    });
+    res.status(201).json({ message: "用户注册成功", user: newUser });
+  } catch (error) {
+    res.status(500).json({ error: "注册失败", details: error });
+  }
+};
+
+// 用户登录
+exports.loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await db.Users.findOne({ where: { email } });
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    return res.status(401).json({ message: "登录失败，凭据无效" });
+  }
+
+  const token = jwt.sign({ user_id: user.user_id }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+
+  res.json({ token, message: "登录成功" });
+};
+
+2.2 地图与位置模块 (Location & Map Service)
+
+/services/locationService.js
+
+const db = require("../config/database");
+
+// 更新用户位置
+exports.updateUserLocation = async (req, res) => {
+  const { user_id, lat, lng } = req.body;
+
+  try {
+    await db.UserLocation.findOneAndUpdate(
+      { user_id },
+      { location_lat: lat, location_lng: lng, last_updated: Date.now() },
+      { upsert: true }
+    );
+    res.json({ message: "位置更新成功" });
+  } catch (error) {
+    res.status(500).json({ error: "位置更新失败", details: error });
+  }
+};
+
+// 获取用户位置
+exports.getUserLocation = async (req, res) => {
+  const { user_id } = req.params;
+
+  try {
+    const location = await db.UserLocation.findOne({ user_id });
+    if (!location) {
+      return res.status(404).json({ message: "未找到位置" });
+    }
+    res.json(location);
+  } catch (error) {
+    res.status(500).json({ error: "获取位置失败", details: error });
+  }
+};
+
+2.3 社交推荐引擎 (Social Recommendation Engine)
+
+/services/socialService.js
+
+const db = require("../config/database");
+const { calculateMatchingScore, calculateLocationProximity } = require("../utils/matchingEngine");
+
+// 推荐好友
+exports.recommendFriends = async (req, res) => {
+  const { user_id } = req.params;
+
+  try {
+    const currentUser = await db.Users.findOne({ where: { user_id } });
+    const allUsers = await db.Users.findAll({ where: { user_id: { $ne: user_id } } });
+
+    const recommendations = allUsers.map((user) => {
+      const interestScore = calculateMatchingScore(currentUser.interests, user.interests);
+      const locationScore = calculateLocationProximity(
+        currentUser.location_lat, currentUser.location_lng,
+        user.location_lat, user.location_lng
+      );
+
+      const totalScore = interestScore * 0.6 + locationScore * 0.4;
+      return { user_id: user.user_id, score: totalScore };
+    });
+
+    recommendations.sort((a, b) => b.score - a.score);
+
+    res.json(recommendations);
+  } catch (error) {
+    res.status(500).json({ error: "推荐失败", details: error });
+  }
+};
+
+3. 数据库迁移脚本 (Database Migration Scripts)
+
+/database/migrations/init.sql
+
+CREATE DATABASE future_social_app;
+
+/database/migrations/create_users_table.sql
+
+CREATE TABLE Users (
+    user_id UUID PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    profile_photo_url TEXT,
+    bio TEXT,
+    join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+/database/migrations/create_social_interactions.sql
+
+CREATE TABLE SocialInteractions (
+    interaction_id UUID PRIMARY KEY,
+    sender_id UUID NOT NULL,
+    receiver_id UUID NOT NULL,
+    interaction_type VARCHAR(50) NOT NULL,
+    message TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+4. 云端部署方案 (Cloud Deployment Plan)
+
+基础架构 (Infrastructure)
+
+服务类型	提供商/技术
+云计算服务	AWS EC2 / Azure VM
+数据库服务	AWS RDS / Azure SQL
+对象存储服务	AWS S3 / Firebase
+推送通知服务	Firebase Cloud Messaging
+地图 API	Google Maps API
+
+部署步骤 (Deployment Steps)
+	1.	配置环境变量 (.env 文件)
+
+JWT_SECRET=YOUR_SECRET_KEY
+DATABASE_URL=YOUR_DATABASE_URL
+
+
+	2.	Docker Compose 配置 (docker-compose.yml)
+
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - JWT_SECRET=YOUR_SECRET_KEY
+      - DATABASE_URL=YOUR_DATABASE_URL
+
+未来社交平台：完整代码与云部署文档
+
+项目结构 (Project Structure)
+
+/future-social-app
+    |-- /backend
+        |-- /api
+            |-- /services
+                |-- authService.js
+                |-- userService.js
+                |-- locationService.js
+                |-- socialService.js
+                |-- missionService.js
+            |-- /models
+                |-- User.js
+                |-- Location.js
+                |-- Interaction.js
+                |-- Mission.js
+            |-- /routes
+                |-- authRoutes.js
+                |-- userRoutes.js
+                |-- locationRoutes.js
+                |-- socialRoutes.js
+                |-- missionRoutes.js
+        |-- /config
+            |-- database.js
+            |-- jwtConfig.js
+            |-- env.js
+        |-- index.js (API Server Entry)
+    |-- /frontend
+        |-- /src
+            |-- /components
+            |-- /pages
+            |-- App.js
+            |-- index.js
+    |-- /database
+        |-- migrations
+            |-- init.sql
+            |-- create_users_table.sql
+            |-- create_social_interactions.sql
+            |-- create_missions.sql
+    |-- docker-compose.yml
+    |-- Dockerfile
+    |-- package.json
+    |-- README.md
+
+完整代码实现 (Backend API Server)
+
+1. 用户管理模块 (User Management Service)
+
+/services/authService.js
+
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const db = require("../config/database");
+
+// 注册新用户
+exports.registerUser = async (req, res) => {
+  const { username, email, password } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  try {
+    const newUser = await db.Users.create({
+      user_id: generateUUID(),
+      username,
+      email,
+      password_hash: hashedPassword,
+    });
+    res.status(201).json({ message: "注册成功", user: newUser });
+  } catch (error) {
+    res.status(500).json({ error: "注册失败", details: error });
+  }
+};
+
+// 用户登录
+exports.loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await db.Users.findOne({ where: { email } });
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    return res.status(401).json({ message: "登录失败，凭据无效" });
+  }
+
+  const token = jwt.sign({ user_id: user.user_id }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+
+  res.json({ token, message: "登录成功" });
+};
+
+/services/locationService.js
+
+const db = require("../config/database");
+
+// 更新用户位置
+exports.updateUserLocation = async (req, res) => {
+  const { user_id, lat, lng } = req.body;
+
+  try {
+    await db.UserLocation.findOneAndUpdate(
+      { user_id },
+      { location_lat: lat, location_lng: lng, last_updated: Date.now() },
+      { upsert: true }
+    );
+    res.json({ message: "位置更新成功" });
+  } catch (error) {
+    res.status(500).json({ error: "位置更新失败", details: error });
+  }
+};
+
+// 获取用户位置
+exports.getUserLocation = async (req, res) => {
+  const { user_id } = req.params;
+
+  try {
+    const location = await db.UserLocation.findOne({ user_id });
+    if (!location) {
+      return res.status(404).json({ message: "未找到位置" });
+    }
+    res.json(location);
+  } catch (error) {
+    res.status(500).json({ error: "获取位置失败", details: error });
+  }
+};
+
+/services/socialService.js
+
+const db = require("../config/database");
+const { calculateMatchingScore, calculateLocationProximity } = require("../utils/matchingEngine");
+
+// 推荐好友
+exports.recommendFriends = async (req, res) => {
+  const { user_id } = req.params;
+
+  try {
+    const currentUser = await db.Users.findOne({ where: { user_id } });
+    const allUsers = await db.Users.findAll({ where: { user_id: { $ne: user_id } } });
+
+    const recommendations = allUsers.map((user) => {
+      const interestScore = calculateMatchingScore(currentUser.interests, user.interests);
+      const locationScore = calculateLocationProximity(
+        currentUser.location_lat, currentUser.location_lng,
+        user.location_lat, user.location_lng
+      );
+
+      const totalScore = interestScore * 0.6 + locationScore * 0.4;
+      return { user_id: user.user_id, score: totalScore };
+    });
+
+    recommendations.sort((a, b) => b.score - a.score);
+
+    res.json(recommendations);
+  } catch (error) {
+    res.status(500).json({ error: "推荐失败", details: error });
+  }
+};
+
+2. 数据库迁移脚本 (Database Migration Scripts)
+
+/database/migrations/init.sql
+
+CREATE DATABASE future_social_app;
+
+/database/migrations/create_users_table.sql
+
+CREATE TABLE Users (
+    user_id UUID PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    profile_photo_url TEXT,
+    bio TEXT,
+    join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+/database/migrations/create_social_interactions.sql
+
+CREATE TABLE SocialInteractions (
+    interaction_id UUID PRIMARY KEY,
+    sender_id UUID NOT NULL,
+    receiver_id UUID NOT NULL,
+    interaction_type VARCHAR(50) NOT NULL,
+    message TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+3. 云端部署方案 (Cloud Deployment Plan)
+
+基础架构 (Infrastructure)
+
+服务类型	提供商/技术
+云计算服务	AWS EC2 / Azure VM
+数据库服务	AWS RDS / Azure SQL
+对象存储服务	AWS S3 / Firebase
+推送通知服务	Firebase Cloud Messaging
+地图 API	Google Maps API
+
+部署步骤 (Deployment Steps)
+	1.	配置环境变量 (.env 文件)
+
+JWT_SECRET=YOUR_SECRET_KEY
+DATABASE_URL=YOUR_DATABASE_URL
+
+
+	2.	Docker Compose 配置 (docker-compose.yml)
+
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - JWT_SECRET=YOUR_SECRET_KEY
+      - DATABASE_URL=YOUR_DATABASE_URL
+
+未来社交平台：完整代码与云部署文档
+
+项目结构 (Project Structure)
+
+/future-social-app
+    |-- /backend
+        |-- /api
+            |-- /services
+                |-- authService.js
+                |-- userService.js
+                |-- locationService.js
+                |-- socialService.js
+                |-- missionService.js
+            |-- /models
+                |-- User.js
+                |-- Location.js
+                |-- Interaction.js
+                |-- Mission.js
+            |-- /routes
+                |-- authRoutes.js
+                |-- userRoutes.js
+                |-- locationRoutes.js
+                |-- socialRoutes.js
+                |-- missionRoutes.js
+        |-- /config
+            |-- database.js
+            |-- jwtConfig.js
+            |-- env.js
+        |-- index.js (API Server Entry)
+    |-- /frontend
+        |-- /src
+            |-- /components
+            |-- /pages
+            |-- App.js
+            |-- index.js
+    |-- /database
+        |-- migrations
+            |-- init.sql
+            |-- create_users_table.sql
+            |-- create_social_interactions.sql
+            |-- create_missions.sql
+    |-- docker-compose.yml
+    |-- Dockerfile
+    |-- package.json
+    |-- README.md
+
+完整代码实现 (Backend API Server)
+
+1. 用户管理模块 (User Management Service)
+
+/services/authService.js
+
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const db = require("../config/database");
+
+// 注册新用户
+exports.registerUser = async (req, res) => {
+  const { username, email, password } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  try {
+    const newUser = await db.Users.create({
+      user_id: generateUUID(),
+      username,
+      email,
+      password_hash: hashedPassword,
+    });
+    res.status(201).json({ message: "注册成功", user: newUser });
+  } catch (error) {
+    res.status(500).json({ error: "注册失败", details: error });
+  }
+};
+
+// 用户登录
+exports.loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await db.Users.findOne({ where: { email } });
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    return res.status(401).json({ message: "登录失败，凭据无效" });
+  }
+
+  const token = jwt.sign({ user_id: user.user_id }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+
+  res.json({ token, message: "登录成功" });
+};
+
+/services/locationService.js
+
+const db = require("../config/database");
+
+// 更新用户位置
+exports.updateUserLocation = async (req, res) => {
+  const { user_id, lat, lng } = req.body;
+
+  try {
+    await db.UserLocation.findOneAndUpdate(
+      { user_id },
+      { location_lat: lat, location_lng: lng, last_updated: Date.now() },
+      { upsert: true }
+    );
+    res.json({ message: "位置更新成功" });
+  } catch (error) {
+    res.status(500).json({ error: "位置更新失败", details: error });
+  }
+};
+
+// 获取用户位置
+exports.getUserLocation = async (req, res) => {
+  const { user_id } = req.params;
+
+  try {
+    const location = await db.UserLocation.findOne({ user_id });
+    if (!location) {
+      return res.status(404).json({ message: "未找到位置" });
+    }
+    res.json(location);
+  } catch (error) {
+    res.status(500).json({ error: "获取位置失败", details: error });
+  }
+};
+
+/services/socialService.js
+
+const db = require("../config/database");
+const { calculateMatchingScore, calculateLocationProximity } = require("../utils/matchingEngine");
+
+// 推荐好友
+exports.recommendFriends = async (req, res) => {
+  const { user_id } = req.params;
+
+  try {
+    const currentUser = await db.Users.findOne({ where: { user_id } });
+    const allUsers = await db.Users.findAll({ where: { user_id: { $ne: user_id } } });
+
+    const recommendations = allUsers.map((user) => {
+      const interestScore = calculateMatchingScore(currentUser.interests, user.interests);
+      const locationScore = calculateLocationProximity(
+        currentUser.location_lat, currentUser.location_lng,
+        user.location_lat, user.location_lng
+      );
+
+      const totalScore = interestScore * 0.6 + locationScore * 0.4;
+      return { user_id: user.user_id, score: totalScore };
+    });
+
+    recommendations.sort((a, b) => b.score - a.score);
+
+    res.json(recommendations);
+  } catch (error) {
+    res.status(500).json({ error: "推荐失败", details: error });
+  }
+};
+
+2. 数据库迁移脚本 (Database Migration Scripts)
+
+/database/migrations/init.sql
+
+CREATE DATABASE future_social_app;
+
+/database/migrations/create_users_table.sql
+
+CREATE TABLE Users (
+    user_id UUID PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    profile_photo_url TEXT,
+    bio TEXT,
+    join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+/database/migrations/create_social_interactions.sql
+
+CREATE TABLE SocialInteractions (
+    interaction_id UUID PRIMARY KEY,
+    sender_id UUID NOT NULL,
+    receiver_id UUID NOT NULL,
+    interaction_type VARCHAR(50) NOT NULL,
+    message TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+3. 云端部署方案 (Cloud Deployment Plan)
+
+基础架构 (Infrastructure)
+
+服务类型	提供商/技术
+云计算服务	AWS EC2 / Azure VM
+数据库服务	AWS RDS / Azure SQL
+对象存储服务	AWS S3 / Firebase
+推送通知服务	Firebase Cloud Messaging
+地图 API	Google Maps API
+
+部署步骤 (Deployment Steps)
+	1.	配置环境变量 (.env 文件)
+
+JWT_SECRET=YOUR_SECRET_KEY
+DATABASE_URL=YOUR_DATABASE_URL
+
+
+	2.	Docker Compose 配置 (docker-compose.yml)
+
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - JWT_SECRET=YOUR_SECRET_KEY
+      - DATABASE_URL=YOUR_DATABASE_URL
+
 
 
