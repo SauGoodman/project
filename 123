@@ -1,126 +1,125 @@
-import boto3
+import json
 import logging
+import awswrangler as wr
 import requests
 import pandas as pd
+import boto3
 from botocore.exceptions import ClientError
+from time import sleep
 
 # --- ログ設定 ---
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# --- S3 と DynamoDB 設定 ---
-s3_client = boto3.client('s3')
+# --- DynamoDB 設定 ---
 dynamodb = boto3.resource('dynamodb')
 table_name = "RequestCount"
 request_count_table = dynamodb.Table(table_name)
 
-# S3 バケット設定
-BUCKET_NAME = "mastergpoc"
-FILE_PATHS = {
-    "old_csv": "input/01_product_old.csv",
-    "new_csv": "input/01_product_new.csv",
-    "compare_csv": "temp/01_product_compare.csv",
-    "apipost_csv": "result/01_product_apipost.csv",
-    "apiput_csv": "result/01_product_apiput.csv"
-}
-
-# API 設定
-TOKEN = "Bearer eyJ0eXAioiJKV1QiL..."  # 替换为有效的Token
-HEADERS = {
+# --- API設定 ---
+token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"  # トークンはセキュアに管理すること
+headers = {
     "User-Agent": "test-agent",
-    "Authorization": TOKEN,
+    "Authorization": token,
     "ClientId": "75"
 }
+
+BATCH_SIZE = 100  # APIリクエストのバッチサイズ
 API_URL = "https://api.plapi-product.com/plapi/api/v1/products"
-BATCH_SIZE = 100
 
-# --- S3 ファイル削除 ---
-def delete_s3_file(bucket, key):
+# --- 欠損値処理関数 ---
+def sanitize_value(value, default=""):
+    """欠損値をデフォルト値に置き換える"""
+    if pd.isna(value) or value is None:
+        return default
+    return str(value).strip()
+
+# --- DynamoDB操作 ---
+def get_last_processed_count(method_type):
+    """DynamoDBから処理済み件数を取得"""
     try:
-        s3_client.delete_object(Bucket=bucket, Key=key)
-        logger.info(f"削除完了: s3://{bucket}/{key}")
+        response = request_count_table.get_item(Key={"FunctionType": method_type})
+        return int(response['Item']['RecCount']) if 'Item' in response else 0
     except Exception as e:
-        logger.error(f"ファイル削除エラー: {e}")
+        logger.error(f"DynamoDB取得エラー: {e}")
+        return 0
 
-# --- S3 ファイルリネーム ---
-def rename_s3_file(bucket, old_key, new_key):
+def update_request_count(method_type, count):
+    """DynamoDBに処理件数を更新"""
     try:
-        s3_client.copy_object(
-            Bucket=bucket, 
-            CopySource={'Bucket': bucket, 'Key': old_key}, 
-            Key=new_key
+        request_count_table.update_item(
+            Key={"FunctionType": method_type},
+            UpdateExpression="SET RecCount = :count",
+            ExpressionAttributeValues={":count": count}
         )
-        s3_client.delete_object(Bucket=bucket, Key=old_key)
-        logger.info(f"リネーム完了: {old_key} → {new_key}")
     except Exception as e:
-        logger.error(f"ファイルリネームエラー: {e}")
+        logger.error(f"DynamoDB更新エラー: {e}")
 
-# --- DynamoDB レコード削除 ---
-def delete_dynamodb_records():
-    try:
-        response = request_count_table.scan()
-        for item in response.get('Items', []):
-            request_count_table.delete_item(Key={"FunctionType": item["FunctionType"]})
-            logger.info(f"DynamoDB レコード削除: {item['FunctionType']}")
-    except Exception as e:
-        logger.error(f"DynamoDB レコード削除エラー: {e}")
+# --- データ処理関数 ---
+def process_data(df, method="POST"):
+    """POST/PUTリクエストを処理"""
+    for i in range(0, len(df), BATCH_SIZE):
+        batch_df = df.iloc[i:i + BATCH_SIZE]
+        payload = {
+            "products": [
+                {
+                    "category_id":  "j3d7jC0000021623",
+                    "com_product_id": sanitize_value(row.get("buturyu_cd")),
+                    "product_name": sanitize_value(row.get("seihin_rkj")),
+                    "product_text": "",
+                    "product_status": "1",
+                    "edit_status": "1",
+                    "client_read_auth": "",
+                    "client_write_auth": "",
+                    "view_auth_group": "j3d7j_base",
+                    "edit_auth_group": "j3d7j_base",
+                    "basic": [
+                        {"id": "j3d7jE0000289845", "key": "正式商品名", "value": sanitize_value(row.get("seisiki_syohin_nm"))},
+                        {"id": "j3d7jE0000289846", "key": "正式商品名備考", "value": sanitize_value(row.get("seisiki_syohin_ob"))},
+                        {"id": "j3d7jE0000289847", "key": "製品名称漢字", "value": sanitize_value(row.get("seihin_kj"))},
+                        {"id": "j3d7jE0000289853", "key": "希望小売価格", "value": sanitize_value(row.get("kibou_kouri_pr"))}
+                    ]
+                }
+                for _, row in batch_df.iterrows()
+            ]
+        }
+        try:
+            response = requests.post(API_URL, headers=headers, json=payload) if method == "POST" \
+                else requests.put(API_URL, headers=headers, json=payload)
+            logger.info(f"{method}結果: {response.status_code}, 内容: {response.json()}")
+        except Exception as e:
+            logger.error(f"{method}エラー: {e}")
+        sleep(1)
 
-# --- API データ取得 ---
-def fetch_api_data():
-    try:
-        logger.info("API からデータを取得します...")
-        response = requests.get(API_URL, headers=HEADERS)
-        if response.status_code == 200:
-            data = response.json()
-            logger.info("API データ取得完了。")
-            return pd.DataFrame(data)
-        else:
-            logger.error(f"API 取得エラー: {response.status_code} - {response.text}")
-    except Exception as e:
-        logger.error(f"API エラー: {e}")
-    return None
-
-# --- バックアップ処理 ---
-def backup_file():
-    try:
-        logger.info("バックアップ処理を開始します...")
-
-        # S3 ファイル削除
-        files_to_delete = [
-            FILE_PATHS["old_csv"], 
-            FILE_PATHS["compare_csv"], 
-            FILE_PATHS["apipost_csv"], 
-            FILE_PATHS["apiput_csv"]
-        ]
-        for file_key in files_to_delete:
-            delete_s3_file(BUCKET_NAME, file_key)
-
-        # S3 ファイルリネーム
-        rename_s3_file(BUCKET_NAME, FILE_PATHS["new_csv"], FILE_PATHS["old_csv"])
-
-        # DynamoDB レコード削除
-        delete_dynamodb_records()
-
-        # API データ取得と S3 アップロード
-        data = fetch_api_data()
-        if data is not None:
-            temp_file = "/tmp/api_data.csv"
-            data.to_csv(temp_file, index=False)
-            s3_client.upload_file(temp_file, BUCKET_NAME, FILE_PATHS["apipost_csv"])
-            logger.info(f"API データを S3 にアップロードしました: {FILE_PATHS['apipost_csv']}")
-
-        logger.info("バックアップ処理が正常に完了しました。")
-    except Exception as e:
-        logger.error(f"バックアップ処理中にエラーが発生しました: {e}")
-
-# --- Lambda ハンドラー ---
+# --- Lambdaハンドラー ---
 def lambda_handler(event, context):
-    backup_file()
-    return {
-        "statusCode": 200,
-        "body": "Lambda succeed"
-    }
+    bucket_name = "mastergpoc"
+    input_file_key_post = "results/01_product_apipost.csv"
+    input_file_key_put = "results/01_product_apiput.csv"
 
-# --- ローカル実行 ---
-if __name__ == "__main__":
-    backup_file()
+    try:
+        # --- POST処理 ---
+        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_post}")
+        df_post = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_post}", dtype=str)
+        last_post_count = get_last_processed_count("post")
+        post_df = df_post.iloc[last_post_count:]
+        if not post_df.empty:
+            logger.info(f"POST処理データ: {len(post_df)} 件")
+            process_data(post_df, method="POST")
+            update_request_count("post", last_post_count + len(post_df))
+
+        # --- PUT処理 ---
+        logger.info(f"S3読み込み: {bucket_name}/{input_file_key_put}")
+        df_put = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_put}", dtype=str)
+        last_put_count = get_last_processed_count("put")
+        put_df = df_put.iloc[last_put_count:]
+        if not put_df.empty:
+            logger.info(f"PUT処理データ: {len(put_df)} 件")
+            process_data(put_df, method="PUT")
+            update_request_count("put", last_put_count + len(put_df))
+
+        return {"statusCode": 200, "body": "POSTとPUT処理が完了しました"}
+
+    except Exception as e:
+        logger.error(f"エラーが発生しました: {e}")
+        return {"statusCode": 500, "body": f"エラー: {e}"}
