@@ -50,13 +50,14 @@ def lambda_handler(event, context):
             chunk = data.iloc[i:i + chunk_size]
             buturyu_cd_list = chunk['buturyu_cd'].tolist()
 
-            # Ensure each `buturyu_cd` is in its original string format
-            joined_buturyu_cd = "&".join([f"" for cd in buturyu_cd_list])
-            api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{joined_buturyu_cd}"
-            
+            # 构建API请求的参数
+            params = {
+                "com_product_id[]": buturyu_cd_list
+            }
+            api_url = "https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs"
 
-            logger.info(f"APIリクエスト送信中: {api_url}")
-            response = requests.get(api_url, headers=headers)
+            logger.info(f"APIリクエスト送信中: {api_url} with params: {params}")
+            response = requests.get(api_url, headers=headers, params=params)
 
             if response.status_code not in [200, 400]:
                 logger.error(f"APIリクエスト失敗: {response.status_code} - {response.text}")
