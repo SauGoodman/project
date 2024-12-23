@@ -34,21 +34,21 @@ def lambda_handler(event, context):
         logger.info(f"読み込んだデータの先頭行: {data[['buturyu_cd']].head()}")
 
         # ステップ2: APIトークンとヘッダーの設定
-        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6..."
+        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIs..."
         headers = {
             "User-Agent": "test-agent",
             "Authorization": token,
             "ClientId": "75"
         }
 
-        # ステップ3: APIリクエストの送信 (100レコードごと)
+        # ステップ3: APIリクエストの送信 (逐行)
         post_df_list = []
         put_df_list = []
 
         for index, row in data.iterrows():
             buturyu_cd = row['buturyu_cd']
 
-            # 构建API请求URL和参数
+            # 构建API请求URL
             api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs/{buturyu_cd}"
             logger.info(f"APIリクエスト送信中: {api_url}")
 
@@ -94,4 +94,16 @@ def lambda_handler(event, context):
 
         # ステップ4: S3に保存
         if not post_df.empty:
-            wr.s3.to_csv(post_df, f's3://mastergpoc/{post_file_key}', index=False
+            wr.s3.to_csv(post_df, f's3://{bucket_name}/{post_file_key}', index=False)
+            logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
+
+        if not put_df.empty:
+            wr.s3.to_csv(put_df, f's3://{bucket_name}/{put_file_key}', index=False)
+            logger.info(f"PUT結果を保存しました: s3://{bucket_name}/{put_file_key}")
+
+        logger.info("処理が正常に完了しました。")
+        return {"statusCode": 200, "body": json.dumps("処理が正常に完了しました。")}
+
+    except Exception as e:
+        logger.error(f"エラーが発生しました: {str(e)}")
+        return {"statusCode": 500, "body": f"エラー: {str(e)}"}
