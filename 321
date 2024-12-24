@@ -34,31 +34,26 @@ def lambda_handler(event, context):
         logger.info(f"読み込んだデータの先頭行: {data[['buturyu_cd']].head()}")
 
         # ステップ2: APIトークンとヘッダーの設定
-        token = "Bearer <YOUR_TOKEN_HERE>"  # 替换为你的实际Token
+        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
         headers = {
             "User-Agent": "test-agent",
             "Authorization": token,
             "ClientId": "75"
         }
 
-        # ステップ3: APIリクエストの送信 (100レコードごと)
-        chunk_size = 100
+        # ステップ3: APIリクエストの送信 (逐行)
         post_df_list = []
         put_df_list = []
 
-        for i in range(0, len(data), chunk_size):
-            chunk = data.iloc[i:i + chunk_size]
-            buturyu_cd_list = chunk['buturyu_cd'].tolist()
+        for index, row in data.iterrows():
+            buturyu_cd = row['buturyu_cd']
 
-            # 构建API请求的参数
-            params = {
-                "com_product_id[]": buturyu_cd_list
-            }
-            api_url = "https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs"
+            # API
+            api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{buturyu_cd}"
+            logger.info(f"APIリクエスト送信中: {api_url}")
 
-            logger.info(f"APIリクエスト送信中: {api_url} with params: {params}")
             try:
-                response = requests.get(api_url, headers=headers, params=params, timeout=10)
+                response = requests.get(api_url, headers=headers, timeout=10)
                 if response.status_code not in [200, 400]:
                     logger.error(f"APIリクエスト失敗: {response.status_code} - {response.text}")
                     continue
@@ -78,36 +73,33 @@ def lambda_handler(event, context):
                 template_dict = {str(template["com_product_id"]): template["product_id"] for template in templates}
 
                 # POSTデータフレーム作成
-                post_df = chunk[chunk["buturyu_cd"].isin(error_ids)]
-                if not post_df.empty:
-                    post_df_list.append(post_df)
+                if str(buturyu_cd) in error_ids:
+                    post_df_list.append(row)
 
                 # PUTデータフレーム作成
-                put_df = chunk[chunk["buturyu_cd"].isin(template_dict.keys())]
-                if not put_df.empty:
-                    put_df["product_id"] = put_df["buturyu_cd"].map(template_dict)
-                    put_df = put_df[["product_id"] + list(data.columns)]
-                    put_df_list.append(put_df)
+                if str(buturyu_cd) in template_dict:
+                    row['product_id'] = template_dict[str(buturyu_cd)]
+                    put_df_list.append(row)
 
             except requests.exceptions.Timeout:
-                logger.error(f"APIリクエストがタイムアウトしました: {params}")
+                logger.error(f"APIリクエストがタイムアウトしました: {buturyu_cd}")
                 continue
             except Exception as e:
                 logger.error(f"APIリクエスト中にエラーが発生しました: {str(e)}")
                 continue
 
         # 結果の結合
-        post_df = pd.concat(post_df_list, ignore_index=True) if post_df_list else pd.DataFrame()
-        put_df = pd.concat(put_df_list, ignore_index=True) if put_df_list else pd.DataFrame()
+        post_df = pd.DataFrame(post_df_list)
+        put_df = pd.DataFrame(put_df_list)
 
         # ステップ4: S3に保存
         if not post_df.empty:
-            wr.s3.to_csv(post_df, f's3://mastergpoc/{post_file_key}', index=False)
-            logger.info(f"POST結果を保存しました: s3://mastergpoc/{post_file_key}")
+            wr.s3.to_csv(post_df, f's3://{bucket_name}/{post_file_key}', index=False)
+            logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
 
         if not put_df.empty:
-            wr.s3.to_csv(put_df, f's3://mastergpoc/{put_file_key}', index=False)
-            logger.info(f"PUT結果を保存しました: s3://mastergpoc/{put_file_key}")
+            wr.s3.to_csv(put_df, f's3://{bucket_name}/{put_file_key}', index=False)
+            logger.info(f"PUT結果を保存しました: s3://{bucket_name}/{put_file_key}")
 
         logger.info("処理が正常に完了しました。")
         return {"statusCode": 200, "body": json.dumps("処理が正常に完了しました。")}
