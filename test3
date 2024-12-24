@@ -1,126 +1,85 @@
 import json
 import logging
-import awswrangler as wr  # 确保 awswrangler 已通过 Lambda 层或本地打包导入
+import awswrangler as wr
 import requests
 import pandas as pd
-import boto3
 from botocore.exceptions import ClientError
-from time import sleep
 
-# --- ログ設定 ---
+# ログ設定の初期化
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# --- AWS 资源配置 ---
-dynamodb = boto3.resource('dynamodb')
-table_name = "RequestCount"  # DynamoDB 表名
-request_count_table = dynamodb.Table(table_name)
-
-# --- API 配置 ---
-API_URL = "https://api.plapi-product.com/plapi/api/v1/products"
-TOKEN = "Bearer <YOUR_API_TOKEN>"  # 替换为实际 API Token
-HEADERS = {
-    "User-Agent": "test-agent",
-    "Authorization": TOKEN,
-    "ClientId": "75"
-}
-
-BATCH_SIZE = 100  # 每批次处理的数据条数
-
-# --- DynamoDB 操作 ---
-def get_last_processed_count(method_type):
-    """获取 DynamoDB 中上次处理的记录数"""
-    try:
-        response = request_count_table.get_item(Key={"FunctionType": method_type})
-        return int(response['Item']['RecCount']) if 'Item' in response else 0
-    except Exception as e:
-        logger.error(f"DynamoDB 读取错误: {e}")
-        return 0
-
-def update_request_count(method_type, count):
-    """更新 DynamoDB 中的处理记录数"""
-    try:
-        request_count_table.update_item(
-            Key={"FunctionType": method_type},
-            UpdateExpression="SET RecCount = :count",
-            ExpressionAttributeValues={":count": count}
-        )
-    except Exception as e:
-        logger.error(f"DynamoDB 更新错误: {e}")
-
-# --- POST 数据处理 ---
-def process_post_data(post_df, put_file_path):
-    """处理 POST 请求并生成 PUT 数据文件"""
-    response_list = []
-    for i in range(0, len(post_df), BATCH_SIZE):
-        batch_df = post_df.iloc[i:i + BATCH_SIZE]
-        payload = {
-            "products": [
-                {
-                    "category_id": row.get("category_id", "default"),
-                    "product_name": row.get("product_name", "default"),
-                    "product_status": "1"
-                }
-                for _, row in batch_df.iterrows()
-            ]
-        }
-        try:
-            response = requests.post(API_URL, headers=HEADERS, json=payload)
-            if response.status_code == 200:
-                logger.info(f"POST 成功: {response.json()}")
-                response_list.append(response.json())
-            else:
-                logger.error(f"POST 失败: {response.status_code}, {response.text}")
-        except Exception as e:
-            logger.error(f"POST 请求错误: {e}")
-        sleep(1)  # 防止速率过快
-
-    # 保存 PUT 数据文件
-    save_post_response_to_put_file(post_df, response_list, put_file_path)
-
-def save_post_response_to_put_file(post_df, response_list, put_file_path):
-    """保存 POST 响应为 PUT 数据文件"""
-    put_data = []
-    for i, response in enumerate(response_list):
-        if response and 'products' in response:
-            for product in response['products']:
-                put_data.append({
-                    "product_id": product.get("product_id"),
-                    "category_id": post_df.iloc[i]["category_id"],
-                    "product_name": post_df.iloc[i]["product_name"],
-                    "product_status": "1"
-                })
-    put_df = pd.DataFrame(put_data)
-    put_df.to_csv(put_file_path, index=False)
-    logger.info(f"PUT 数据文件已创建: {put_file_path}")
-
-# --- Lambda 处理函数 ---
 def lambda_handler(event, context):
-    bucket_name = "mastergpoc"
-    input_file_key_post = "results/01_product_apipost.csv"
-    output_file_key_put = "/tmp/01_product_apiput.csv"  # 临时存储路径
-    s3_output_key_put = "results/01_product_apiput.csv"
-
     try:
-        # --- 读取 POST 数据 ---
-        logger.info(f"读取 S3 文件: s3://{bucket_name}/{input_file_key_post}")
-        df_post = wr.s3.read_csv(f"s3://{bucket_name}/{input_file_key_post}", dtype=str)
+        # ステップ1: S3からCSVファイルを文字列型で読み込む
+        bucket_name = "mastergpoc"
+        input_file_key = "temp/01_product_compare.csv"  # 入力ファイルのS3パス
+        output_file_key = "results/01_product_processed.csv"  # 結果保存用S3パス
 
-        # --- 获取上次处理进度 ---
-        last_post_count = get_last_processed_count("post")
-        post_df = df_post.iloc[last_post_count:]
-        if not post_df.empty:
-            logger.info(f"POST 数据处理开始: {len(post_df)} 条记录")
-            process_post_data(post_df, output_file_key_put)
-            update_request_count("post", last_post_count + len(post_df))
+        logger.info(f"S3からCSVファイルを文字列型で読み込み中: s3://{bucket_name}/{input_file_key}")
 
-        # --- 上传 PUT 数据文件到 S3 ---
-        logger.info(f"上传 PUT 数据文件到 S3: s3://{bucket_name}/{s3_output_key_put}")
-        wr.s3.upload(local_file=output_file_key_put, path=f"s3://{bucket_name}/{s3_output_key_put}")
-        logger.info("PUT 数据文件上传成功！")
+        # CSVファイルの読み込み
+        try:
+            data = wr.s3.read_csv(
+                f's3://{bucket_name}/{input_file_key}',
+                dtype=str,  # 全列を文字列型で読み込む
+                keep_default_na=False  # 空白セルをNaNではなく空文字列として扱う
+            )
+        except ClientError as e:
+            logger.error(f"S3ファイルの読み込みに失敗しました: {str(e)}")
+            return {"statusCode": 500, "body": f"S3ファイルの読み込みに失敗しました: {str(e)}"}
 
-        return {"statusCode": 200, "body": "POST 处理完成，PUT 数据已生成并上传到 S3"}
+        logger.info(f"データの型確認: {data.dtypes}")
+        logger.info(f"読み込んだデータの先頭行: {data.head()}")
+
+        # ステップ2: APIトークンとヘッダーの設定
+        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
+        headers = {
+            "User-Agent": "test-agent",
+            "Authorization": token,
+            "ClientId": "75"
+        }
+
+        # ステップ3: APIリクエストの送信 (バッチ処理)
+        batch_size = 100
+        results = []
+
+        for i in range(0, len(data), batch_size):
+            batch = data.iloc[i:i + batch_size]
+            buturyu_ids = batch['buturyu_cd'].tolist()
+
+            # 拼接 API 请求格式
+            query_params = "&".join(buturyu_ids)
+            api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{query_params}"
+            logger.info(f"APIリクエスト送信中: {api_url}")
+
+            try:
+                response = requests.get(api_url, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    templates = response.json().get("templates", [])
+                    for template in templates:
+                        results.append({
+                            "buturyu_cd": template["com_product_id"],
+                            "product_id": template["product_id"]
+                        })
+                else:
+                    logger.error(f"APIリクエスト失敗: {response.status_code} - {response.text}")
+            except requests.exceptions.Timeout:
+                logger.error(f"APIリクエストがタイムアウトしました: {query_params}")
+            except Exception as e:
+                logger.error(f"APIリクエスト中にエラーが発生しました: {str(e)}")
+
+        # ステップ4: 結果をデータフレームに変換し、product_idを最前列に移動
+        results_df = pd.DataFrame(results)
+        final_df = pd.merge(data, results_df, on="buturyu_cd", how="left")
+        final_df = final_df[["product_id"] + [col for col in final_df.columns if col != "product_id"]]
+
+        # ステップ5: S3に保存
+        wr.s3.to_csv(final_df, f's3://{bucket_name}/{output_file_key}', index=False)
+        logger.info(f"結果を保存しました: s3://{bucket_name}/{output_file_key}")
+
+        return {"statusCode": 200, "body": json.dumps("処理が正常に完了しました。")}
 
     except Exception as e:
-        logger.error(f"执行错误: {e}")
-        return {"statusCode": 500, "body": f"错误: {e}"}
+        logger.error(f"エラーが発生しました: {str(e)}")
+        return {"statusCode": 500, "body": f"エラー: {str(e)}"}
