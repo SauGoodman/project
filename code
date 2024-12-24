@@ -1,34 +1,113 @@
-# --- POSTデータを処理 ---
-def process_post_data(post_df):
-    """POSTリクエストを処理"""
-    for i in range(0, len(post_df), BATCH_SIZE):
-        batch_df = post_df.iloc[i:i + BATCH_SIZE]
-        payload = {
-            "products": [
-                {
-                    "category_id": row.get("category_id", "j3d7jC000021623"),
-                    "com_product_id": row.get("buturyu_cd", ""),
-                    "product_name": row.get("seihin_rkj", ""),
-                    "product_text": "",
-                    "product_status": "1",
-                    "edit_status": "1",
-                    "client_read_auth": "",
-                    "client_write_auth": "",
-                    "view_auth_group": "j3d7j_base",
-                    "edit_auth_group": "j3d7j_base",
-                    "basic": [
-                        {"id": "j3d7jE0000289845", "key": "正式商品名", "value": row.get("seisiki_syohin_nm", "")},
-                        {"id": "j3d7jE0000289846", "key": "正式商品名備考", "value": row.get("seisiki_syohin_obn", "")},
-                        {"id": "j3d7jE0000289847", "key": "製品名称", "value": row.get("seihin_kj", "")},
-                        {"id": "j3d7jE0000289853", "key": "希望小売価格", "value": row.get("kibou_kouri_pr", "")}
-                    ]
-                }
-                for _, row in batch_df.iterrows()
-            ]
-        }
+import json
+import logging
+import awswrangler as wr
+import requests
+import pandas as pd
+from botocore.exceptions import ClientError
+
+# ログ設定の初期化
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+def lambda_handler(event, context):
+    try:
+        # ステップ1: S3からCSVファイルを文字列型で読み込む
+        bucket_name = "mastergpoc"
+        input_file_key = "temp/01_product_compare.csv"  # 入力ファイルのS3パス
+        post_file_key = "results/01_product_apipost.csv"  # POST用結果ファイルのS3パス
+        put_file_key = "results/01_product_apiput.csv"  # PUT用結果ファイルのS3パス
+
+        logger.info(f"S3からCSVファイルを文字列型で読み込み中: s3://{bucket_name}/{input_file_key}")
+
+        # CSVファイルの読み込み時にすべての列を文字列型で設定
         try:
-            response = requests.post(API_URL, headers=headers, json=payload)
-            logger.info(f"POST結果: {response.status_code}, 内容: {response.json()}")
-        except Exception as e:
-            logger.error(f"POSTエラー: {e}")
-        sleep(1)
+            data = wr.s3.read_csv(
+                f's3://{bucket_name}/{input_file_key}',
+                dtype=str,  # 全列を文字列型で読み込む
+                keep_default_na=False  # 空白セルをNaNではなく空文字列として扱う
+            )
+        except ClientError as e:
+            logger.error(f"S3ファイルの読み込みに失敗しました: {str(e)}")
+            return {"statusCode": 500, "body": f"S3ファイルの読み込みに失敗しました: {str(e)}"}
+
+        logger.info(f"データの型確認: {data.dtypes}")
+        logger.info(f"読み込んだデータの先頭行: {data[['buturyu_cd']].head()}")
+
+        # ステップ2: APIトークンとヘッダーの設定
+        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
+        headers = {
+            "User-Agent": "test-agent",
+            "Authorization": token,
+            "ClientId": "75"
+        }
+
+        # ステップ3: APIリクエストの送信 (逐行)
+        post_df_list = []
+        put_df_list = []
+
+        for index, row in data.iterrows():
+            buturyu_cd = row['buturyu_cd']
+
+            # APIリクエストURLの生成
+            api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{buturyu_cd}"
+            logger.info(f"APIリクエスト送信中: {api_url}")
+
+            try:
+                response = requests.get(api_url, headers=headers, timeout=10)
+                if response.status_code not in [200, 400]:
+                    logger.error(f"APIリクエスト失敗: {response.status_code} - {response.text}")
+                    continue
+
+                # レスポンス解析
+                try:
+                    api_data = response.json()
+                except json.JSONDecodeError:
+                    logger.error(f"APIレスポンスのデコードに失敗しました: {response.text}")
+                    continue
+
+                errors = api_data.get("errors", [])
+                templates = api_data.get("templates", [])
+
+                # POST と PUT のデータ分割
+                error_ids = {str(error["com_product_id"]) for error in errors}
+                template_dict = {str(template["com_product_id"]): template["product_id"] for template in templates}
+
+                # POSTデータフレーム作成
+                if str(buturyu_cd) in error_ids:
+                    post_df_list.append(row)
+
+                # PUTデータフレーム作成
+                if str(buturyu_cd) in template_dict:
+                    row['product_id'] = template_dict[str(buturyu_cd)]
+                    put_df_list.append(row)
+
+            except requests.exceptions.Timeout:
+                logger.error(f"APIリクエストがタイムアウトしました: {buturyu_cd}")
+                continue
+            except Exception as e:
+                logger.error(f"APIリクエスト中にエラーが発生しました: {str(e)}")
+                continue
+
+        # POST と PUT の結果をDataFrameに変換
+        post_df = pd.DataFrame(post_df_list)
+        put_df = pd.DataFrame(put_df_list)
+
+        # PUT結果のデータフレームにproduct_idを最前列に移動
+        if not put_df.empty:
+            put_df = put_df[["product_id"] + [col for col in put_df.columns if col != "product_id"]]
+
+        # ステップ4: S3に保存
+        if not post_df.empty:
+            wr.s3.to_csv(post_df, f's3://{bucket_name}/{post_file_key}', index=False)
+            logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
+
+        if not put_df.empty:
+            wr.s3.to_csv(put_df, f's3://{bucket_name}/{put_file_key}', index=False)
+            logger.info(f"PUT結果を保存しました: s3://{bucket_name}/{put_file_key}")
+
+        logger.info("処理が正常に完了しました。")
+        return {"statusCode": 200, "body": json.dumps("処理が正常に完了しました。")}
+
+    except Exception as e:
+        logger.error(f"エラーが発生しました: {str(e)}")
+        return {"statusCode": 500, "body": f"エラー: {str(e)}"}
