@@ -16,7 +16,6 @@ def lambda_handler(event, context):
         input_file_key = "temp/01_product_compare.csv"  # 入力ファイルのS3パス
         get_product_file_key = "results/01_product_apiput.csv"  # GET用結果保存パス
         post_file_key = "results/01_product_apipost.csv"  # POST用結果保存パス
-        output_file_key = "results/01_product_processed.csv"  # 最終結果保存用S3パス
 
         logger.info(f"S3からCSVファイルを文字列型で読み込み中: s3://{bucket_name}/{input_file_key}")
 
@@ -35,7 +34,7 @@ def lambda_handler(event, context):
         logger.info(f"読み込んだデータの先頭行: {data.head()}")
 
         # ステップ2: APIトークンとヘッダーの設定
-        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ..."
+        token = "Bearer YOUR_API_TOKEN"  # 替换为实际的API Token
         headers = {
             "User-Agent": "test-agent",
             "Authorization": token,
@@ -46,7 +45,6 @@ def lambda_handler(event, context):
         batch_size = 100
         get_product_results = []
         post_results = []
-        put_results = []
 
         for i in range(0, len(data), batch_size):
             batch = data.iloc[i:i + batch_size]
@@ -80,49 +78,37 @@ def lambda_handler(event, context):
                 try:
                     response = requests.post(post_api_url, headers=headers, json=post_payload)
                     if response.status_code == 201:  # 作成成功
-                        post_results.append({"buturyu_cd": row["buturyu_cd"], "status": "created"})
+                        post_results.append({
+                            "buturyu_cd": row["buturyu_cd"],
+                            "product_id": "",
+                            "status": "created"
+                        })
                     elif response.status_code == 400:
-                        post_results.append({"buturyu_cd": row["buturyu_cd"], "status": "exists"})
+                        post_results.append({
+                            "buturyu_cd": row["buturyu_cd"],
+                            "product_id": "",
+                            "status": "exists"
+                        })
                     else:
                         logger.error(f"POSTエラー: {response.status_code} - {response.text}")
                 except Exception as e:
                     logger.error(f"POSTエラー: {str(e)}")
 
-            # PUT 操作
-            for _, row in batch.iterrows():
-                put_api_url = "https://api.plapi-product.com/plapi/api/v1/putProduct"
-                put_payload = {"buturyu_cd": row["buturyu_cd"], "header_ProductName": row.get("product_name", "default")}
-                try:
-                    response = requests.put(put_api_url, headers=headers, json=put_payload)
-                    if response.status_code == 200:  # 更新成功
-                        put_results.append({"buturyu_cd": row["buturyu_cd"], "status": "updated"})
-                    else:
-                        logger.error(f"PUTエラー: {response.status_code} - {response.text}")
-                except Exception as e:
-                    logger.error(f"PUTエラー: {str(e)}")
-
         # ステップ4: GET 結果を保存
         get_results_df = pd.DataFrame(get_product_results)
-        wr.s3.to_csv(get_results_df, f's3://{bucket_name}/{get_product_file_key}', index=False)
-        logger.info(f"GET結果を保存しました: s3://{bucket_name}/{get_product_file_key}")
+        if not get_results_df.empty:
+            get_results_df = pd.merge(data, get_results_df, on="buturyu_cd", how="inner")
+            get_results_df = get_results_df[["product_id"] + [col for col in get_results_df.columns if col != "product_id"]]
+            wr.s3.to_csv(get_results_df, f's3://{bucket_name}/{get_product_file_key}', index=False)
+            logger.info(f"GET結果を保存しました: s3://{bucket_name}/{get_product_file_key}")
 
         # ステップ5: POST 結果を保存
         post_results_df = pd.DataFrame(post_results)
-        wr.s3.to_csv(post_results_df, f's3://{bucket_name}/{post_file_key}', index=False)
-        logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
-
-        # ステップ6: PUT 結果を保存
-        put_results_df = pd.DataFrame(put_results)
-        wr.s3.to_csv(put_results_df, f's3://{bucket_name}/results/01_product_apiput_post.csv', index=False)
-        logger.info(f"PUT結果を保存しました: s3://{bucket_name}/results/01_product_apiput_post.csv")
-
-        # ステップ7: 保存されたgetProductIDデータをメインデータに統合
-        final_df = pd.merge(data, get_results_df, on="buturyu_cd", how="left")
-        final_df = final_df[["product_id"] + [col for col in final_df.columns if col != "product_id"]]
-
-        # ステップ8: 最終結果をS3に保存
-        wr.s3.to_csv(final_df, f's3://{bucket_name}/{output_file_key}', index=False)
-        logger.info(f"処理結果を保存しました: s3://{bucket_name}/{output_file_key}")
+        if not post_results_df.empty:
+            post_results_df = pd.merge(data, post_results_df, on="buturyu_cd", how="inner")
+            post_results_df = post_results_df[["product_id"] + [col for col in post_results_df.columns if col != "product_id"]]
+            wr.s3.to_csv(post_results_df, f's3://{bucket_name}/{post_file_key}', index=False)
+            logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
 
         return {"statusCode": 200, "body": json.dumps("処理が正常に完了しました。")}
 
