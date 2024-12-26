@@ -34,16 +34,16 @@ def lambda_handler(event, context):
         logger.info(f"読み込んだデータの先頭行: {data.head()}")
 
         # ステップ2: APIトークンとヘッダーの設定
-        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"  # トークンはセキュアに管理すること
+        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI3NSIsImp0aSI6IjA0OTM0MmQyZTViMDdmNDY4ZmQ3ZGExNmFhODEwZTZhMjMyYjk1MjMxN2ZlNGFkMzIxMWFhNTI1NzA3Y2UzYWI3ZWIyOGU3MTNmZDMxZGVlIiwiaWF0IjoxNzMzMzYyMTcxLjUwNDYzOCwibmJmIjoxNzMzMzYyMTcxLjUwNDY0MSwiZXhwIjoxNzUwNjQyMTcxLjQyNDAxNSwic3ViIjoiIiwic2NvcGVzIjpbIioiXX0.LMPyWDzLvv-SqZOg6anSsuaSLR1FgmoFd2Op4jS-dtT8J87zVqfaBgMyVBDftAXgKZnH_Xe4MzXVyhdKZ6JDcSuB5ENbFqIPzFxePeQFSlFxwV3rCBuq7vpX9BmLnV8bwMawGC_SX980z9wkk7m90v_x-EOYjkmLC9BYDS8wyfEQAGa67-ibHci_okmAKAMHE8Zc9BwFUkW-FjF3P26qUjlrkh4HC5uRh0BKTts61q8pc7VqbAithJK7KcAf2quiyuUBoq87XIGGnT9rxd2xd_oykO8Gh9iC-bNdxJLcIU9TInOXjjW9O-DjcJB8NfJo62xl72SdENnG_m4z9eGAamDCkFk1iM12vFiMeOhm1Id8nMD7ZgEf9E1z6oI6Qp705RnT-ZuP9DFy8bNiIciezU3AuHKrgTErSDVDaKHCEOfLN74LKiB9RWhTZc7Aje4xAWQOVdWR98y9I8-VfytWxPGRpHCAtgY4XBc6ghkreV0QgK-eVYc1q4jNJaLQLo0jUnpQ5SSVEHyQWDErForoMknaf-4bewQVPE-fIuZIt1HoOZ20UJ0sXBI1WgYO9qUzxZWz4y78zX7XToDOzdx8KHu9RVF2VxUZ9smwM3aYk7K6Fn24ilEDUSyXokbIMzcP5K9lb780o3ODlN6Ak2F-M43t15fEw205bWNvqXNeBXo"
         headers = {
             "User-Agent": "test-agent",
             "Authorization": token,
             "ClientId": "75"
         }
 
-        # ステップ3: getProductID APIの呼び出し (バッチ処理)
+        # ステップ3: APIの呼び出し (バッチ処理)
         batch_size = 100
-        get_product_results = []
+        put_results = []
         post_results = []
 
         for i in range(0, len(data), batch_size):
@@ -60,7 +60,7 @@ def lambda_handler(event, context):
                 if response.status_code == 200:
                     templates = response.json().get("templates", [])
                     for template in templates:
-                        get_product_results.append({
+                        put_results.append({
                             "buturyu_cd": template["com_product_id"],
                             "product_id": template["product_id"]
                         })
@@ -80,13 +80,11 @@ def lambda_handler(event, context):
                     if response.status_code == 201:  # 作成成功
                         post_results.append({
                             "buturyu_cd": row["buturyu_cd"],
-                            "product_id": "",
                             "status": "created"
                         })
                     elif response.status_code == 400:
                         post_results.append({
                             "buturyu_cd": row["buturyu_cd"],
-                            "product_id": "",
                             "status": "exists"
                         })
                     else:
@@ -94,19 +92,19 @@ def lambda_handler(event, context):
                 except Exception as e:
                     logger.error(f"POSTエラー: {str(e)}")
 
-        # ステップ4: GET 結果を保存
-        get_results_df = pd.DataFrame(get_product_results)
-        if not get_results_df.empty:
-            get_results_df = pd.merge(data, get_results_df, on="buturyu_cd", how="inner")
-            get_results_df = get_results_df[["product_id"] + [col for col in get_results_df.columns if col != "product_id"]]
-            wr.s3.to_csv(get_results_df, f's3://{bucket_name}/{get_product_file_key}', index=False)
-            logger.info(f"GET結果を保存しました: s3://{bucket_name}/{get_product_file_key}")
+        # ステップ4: PUT 結果を保存
+        put_results_df = pd.DataFrame(put_results)
+        if not put_results_df.empty:
+            put_results_df = pd.merge(data, put_results_df, on="buturyu_cd", how="inner")
+            put_results_df = put_results_df[["product_id"] + [col for col in put_results_df.columns if col != "product_id"]]
+            wr.s3.to_csv(put_results_df, f's3://{bucket_name}/{get_product_file_key}', index=False)
+            logger.info(f"PUT結果を保存しました: s3://{bucket_name}/{get_product_file_key}")
 
         # ステップ5: POST 結果を保存
         post_results_df = pd.DataFrame(post_results)
         if not post_results_df.empty:
             post_results_df = pd.merge(data, post_results_df, on="buturyu_cd", how="inner")
-            post_results_df = post_results_df[["product_id"] + [col for col in post_results_df.columns if col != "product_id"]]
+            post_results_df = post_results_df[[col for col in post_results_df.columns if col != "product_id"]]
             wr.s3.to_csv(post_results_df, f's3://{bucket_name}/{post_file_key}', index=False)
             logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
 
