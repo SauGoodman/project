@@ -11,104 +11,84 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     try:
-        # ステップ1: S3からCSVファイルを文字列型で読み込む
+        # S3ファイル情報
         bucket_name = "mastergpoc"
-        input_file_key = "temp/01_product_compare.csv"  # 入力ファイルのS3パス
-        get_product_file_key = "results/01_product_apiput.csv"  # GET用結果保存パス
-        post_file_key = "results/01_product_apipost.csv"  # POST用結果保存パス
+        input_file_key = "temp/01_product_compare.csv"
+        error_file_key = "results/01_product_error.csv"
+        template_file_key = "results/01_product_template.csv"
 
-        logger.info(f"S3からCSVファイルを文字列型で読み込み中: s3://{bucket_name}/{input_file_key}")
+        logger.info(f"S3からCSVファイルを読み込み中: s3://{bucket_name}/{input_file_key}")
 
-        # CSVファイルの読み込み
+        # CSVファイルを読み込む
         try:
             data = wr.s3.read_csv(
                 f's3://{bucket_name}/{input_file_key}',
-                dtype=str,  # 全列を文字列型で読み込む
-                keep_default_na=False  # 空白セルをNaNではなく空文字列として扱う
+                dtype=str,  # 全ての列を文字列型として読み込む
+                keep_default_na=False
             )
         except ClientError as e:
-            logger.error(f"S3ファイルの読み込みに失敗しました: {str(e)}")
-            return {"statusCode": 500, "body": f"S3ファイルの読み込みに失敗しました: {str(e)}"}
+            logger.error(f"S3ファイルの読み込み失敗: {str(e)}")
+            return {"statusCode": 500, "body": f"エラー: {str(e)}"}
 
-        logger.info(f"データの型確認: {data.dtypes}")
-        logger.info(f"読み込んだデータの先頭行: {data.head()}")
+        logger.info(f"データ: {data.head()}")
 
-        # ステップ2: APIトークンとヘッダーの設定
-        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ..."  # トークンはセキュアに管理すること
+        # API設定
+        token = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ..."
         headers = {
-            "User-Agent": "test-agent",
             "Authorization": token,
-            "ClientId": "75"
+            "Content-Type": "application/json"
         }
 
-        # ステップ3: APIの呼び出し (バッチ処理)
-        batch_size = 100
-        put_results = []
-        post_results = []
+        errors = []
+        templates = []
 
-        for i in range(0, len(data), batch_size):
-            batch = data.iloc[i:i + batch_size]
-            buturyu_ids = batch['buturyu_cd'].tolist()
-
-            # 拼接 GET API 请求格式
-            query_params = "&".join(buturyu_ids)
-            get_api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/catalogs?{query_params}"
-            logger.info(f"GET APIリクエスト送信中: {get_api_url}")
+        # 各行に対してAPI処理
+        for _, row in data.iterrows():
+            buturyu_cd = row["buturyu_cd"]
+            get_api_url = f"https://api.plapi-product.com/plapi/api/v1/com_product_id/{buturyu_cd}"
 
             try:
-                response = requests.get(get_api_url, headers=headers, timeout=10)
+                response = requests.get(get_api_url, headers=headers)
                 if response.status_code == 200:
-                    templates = response.json().get("templates", [])
-                    for template in templates:
-                        put_results.append({
-                            "buturyu_cd": template["com_product_id"],
-                            "product_id": template["product_id"]
+                    # 正常なレスポンス
+                    json_data = response.json()
+                    templates_data = json_data.get("templates", [])
+                    for template in templates_data:
+                        templates.append({
+                            "product_id": template["product_id"],
+                            "buturyu_cd": buturyu_cd,
+                            **row.to_dict()
                         })
+                elif response.status_code == 400:
+                    error_data = {
+                        "buturyu_cd": buturyu_cd,
+                        "status_code": response.status_code,
+                        "error_message": response.json().get("error", "Unknown Error")
+                    }
+                    errors.append(error_data)
                 else:
-                    logger.error(f"GET APIリクエスト失敗: {response.status_code} - {response.text}")
-            except requests.exceptions.Timeout:
-                logger.error(f"GET APIリクエストがタイムアウトしました: {query_params}")
-            except Exception as e:
-                logger.error(f"GET APIリクエスト中にエラーが発生しました: {str(e)}")
+                    logger.error(f"予期しないステータスコード: {response.status_code}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"APIリクエスト中にエラー発生: {str(e)}")
+                errors.append({
+                    "buturyu_cd": buturyu_cd,
+                    "status_code": "RequestException",
+                    "error_message": str(e)
+                })
 
-            # POST 操作
-            for _, row in batch.iterrows():
-                post_api_url = "https://api.plapi-product.com/plapi/api/v1/products"
-                post_payload = {"buturyu_cd": row["buturyu_cd"], "details": row.to_dict()}
-                try:
-                    response = requests.post(post_api_url, headers=headers, json=post_payload)
-                    if response.status_code == 201:  # 作成成功
-                        post_results.append({
-                            "buturyu_cd": row["buturyu_cd"],
-                            "status": "created"
-                        })
-                    elif response.status_code == 400:
-                        post_results.append({
-                            "buturyu_cd": row["buturyu_cd"],
-                            "status": "exists"
-                        })
-                    else:
-                        logger.error(f"POSTエラー: {response.status_code} - {response.text}")
-                except Exception as e:
-                    logger.error(f"POSTエラー: {str(e)}")
+        # Templatesデータを保存
+        if templates:
+            templates_df = pd.DataFrame(templates)
+            wr.s3.to_csv(templates_df, f's3://{bucket_name}/{template_file_key}', index=False)
+            logger.info(f"Templatesデータを保存しました: s3://{bucket_name}/{template_file_key}")
 
-        # ステップ4: PUT 結果を保存
-        put_results_df = pd.DataFrame(put_results)
-        if not put_results_df.empty:
-            put_results_df = pd.merge(data, put_results_df, on="buturyu_cd", how="inner")
-            put_results_df = put_results_df[["product_id"] + [col for col in put_results_df.columns if col != "product_id"]]
-            wr.s3.to_csv(put_results_df, f's3://{bucket_name}/{get_product_file_key}', index=False)
-            logger.info(f"PUT結果を保存しました: s3://{bucket_name}/{get_product_file_key}")
+        # Errorsデータを保存
+        if errors:
+            errors_df = pd.DataFrame(errors)
+            wr.s3.to_csv(errors_df, f's3://{bucket_name}/{error_file_key}', index=False)
+            logger.info(f"Errorsデータを保存しました: s3://{bucket_name}/{error_file_key}")
 
-        # ステップ5: POST 結果を保存
-        post_results_df = pd.DataFrame(post_results)
-        if not post_results_df.empty:
-            post_results_df = pd.merge(data, post_results_df, on="buturyu_cd", how="inner")
-            post_results_df = post_results_df[[col for col in post_results_df.columns if col != "product_id"]]
-            wr.s3.to_csv(post_results_df, f's3://{bucket_name}/{post_file_key}', index=False)
-            logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
-
-        return {"statusCode": 200, "body": json.dumps("処理が正常に完了しました。")}
+        return {"statusCode": 200, "body": "処理が正常に完了しました。"}
 
     except Exception as e:
         logger.error(f"エラーが発生しました: {str(e)}")
