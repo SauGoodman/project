@@ -73,16 +73,26 @@ def lambda_handler(event, context):
                 logger.error(f"GETエラー: {str(e)}")
 
         # PUT結果の保存
-        if put_results:
-            put_df = pd.DataFrame(put_results)
-            wr.s3.to_csv(put_df, f's3://{bucket_name}/{put_file_key}', index=False)
-            logger.info(f"PUT結果を保存しました: s3://{bucket_name}/{put_file_key}")
+        put_results_df = pd.DataFrame(put_results)
+        if not put_results_df.empty:
+            put_results_df = pd.merge(data, put_results_df, on="buturyu_cd", how="inner")
+            put_results_df = put_results_df[["product_id"] + [col for col in put_results_df.columns if col != "product_id"]]
+        else:
+            put_results_df = pd.DataFrame(columns=["product_id"] + list(data.columns))
+
+        wr.s3.to_csv(put_results_df, f's3://{bucket_name}/{put_file_key}', index=False)
+        logger.info(f"PUT結果を保存しました: s3://{bucket_name}/{put_file_key}")
 
         # POST結果の保存
-        if post_results:
-            post_df = pd.DataFrame(post_results)
-            wr.s3.to_csv(post_df, f's3://{bucket_name}/{post_file_key}', index=False)
-            logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
+        post_results_df = pd.DataFrame(post_results)
+        if not post_results_df.empty:
+            post_results_df = pd.merge(data, post_results_df, on="buturyu_cd", how="inner")
+            post_results_df = post_results_df[[col for col in post_results_df.columns if col != "product_id"]]
+        else:
+            post_results_df = pd.DataFrame(columns=data.columns)
+
+        wr.s3.to_csv(post_results_df, f's3://{bucket_name}/{post_file_key}', index=False)
+        logger.info(f"POST結果を保存しました: s3://{bucket_name}/{post_file_key}")
 
         return {"statusCode": 200, "body": "PUTとPOSTの処理が完了しました"}
     except Exception as e:
